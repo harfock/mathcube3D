@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Math Cube Puzzle</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="loading">Loading 3D engine...</div>
+<div id="canvas-container"></div>
+
+<div id="hud">
+    <div id="hud-back" class="hud-el">&#8592;</div>
+    <div id="hud-top">
+        <div class="pill" id="hud-level">LEVEL 1</div>
+        <div class="pill" id="hud-time">0.0s</div>
+        <div class="pill" id="hud-score">0</div>
+    </div>
+    <div id="hud-eq">? + ? = ?</div>
+    <div id="progress-pill"><div id="progress-fill"></div></div>
+    <div id="hud-msg">Fill the equation left-to-right. Arrows or WASD rotate.</div>
+    <div id="left-side">
+        <div id="hud-calc"><div class="cap">CALCULATOR</div><div id="calc-val"></div></div>
+        <div id="verify-panel"></div>
+    </div>
+    <div id="hint-wrap">
+        <div class="hstack" id="code-stack"><div id="code-btn" class="hud-el hexbtn hex">CODE</div></div>
+        <div class="hstack" id="verify-stack"><div id="verify-btn" class="hud-el hexbtn hex">VERIFY</div><div id="verify-count">3</div></div>
+        <div class="hstack"><div id="hud-hint" class="hud-el hexbtn hex">HINT</div><div id="hint-count">3</div></div>
+        <div class="hstack" id="adv-stack"><div id="adv-btn" class="hud-el hexbtn hex"><div class="hex in1"><div class="hex in2">HINT x2</div></div></div></div>
+    </div>
+</div>
+
+<div class="screen" id="screen-select">
+    <div id="game-title">MATH CUBE</div>
+    <div id="game-sub">Observe the cube. Solve the equation.</div>
+    <div id="level-path"></div>
+    <div id="apple-badge"><div class="cnt" id="apple-count">0</div><div class="lbl">GOLDEN APPLES</div></div>
+    <div id="save-wrap"><div id="btn-export" class="savebtn">SAVE CODE</div><div id="btn-import" class="savebtn">LOAD CODE</div></div>
+</div>
+
+<div class="overlay" id="code-modal">
+    <div id="code-card">
+        <div id="code-title">ENTER CODE</div>
+        <input id="code-input" type="text" autocomplete="off" spellcheck="false">
+        <div id="code-msg"></div>
+        <div class="mrow">
+            <button class="mbtn" id="code-ok">OK</button>
+            <button class="mbtn" id="code-retry" style="display:none">RETRY</button>
+            <button class="mbtn" id="code-exit">EXIT</button>
+        </div>
+    </div>
+</div>
+
+<div class="overlay" id="adv-modal">
+    <div id="adv-card">
+        <div id="adv-msg"></div>
+        <div class="mrow"><button class="mbtn" id="adv-yes">YES</button><button class="mbtn" id="adv-no">NO</button></div>
+    </div>
+</div>
+
+<div class="screen" id="screen-result">
+    <div id="result-card">
+        <div id="result-title">LEVEL CLEARED</div>
+        <div id="result-stars"></div>
+        <div id="result-stats"></div>
+        <div id="result-phrases"></div>
+        <button class="rbtn" id="btn-menu">LEVELS</button>
+        <button class="rbtn" id="btn-next">NEXT</button>
+    </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
