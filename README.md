@@ -1,113 +1,179 @@
-# Math Cube Puzzle
+# Math Cube
 
-A 3D spatial math puzzle game where you observe a rotating cube, deduce hidden equations, and click the correct number blocks to solve them. Built with Three.js and the native Web Audio API.
+## English
 
----
+Math Cube is a browser-based 3D mathematics game designed for desktop and mobile browsers. It is built with HTML, CSS, JavaScript and Three.js and can be hosted directly on GitHub Pages.
 
-## Features
+### Main Modes
 
-### English
-*   **3D Spatial Puzzle:** Interact with a hollow 3x3x3 cube (26 blocks) in a fully rotatable 3D space.
-*   **Dynamic Equations:** Solve masked equations using mixed operators (+, -, ×, ÷). The number of operators scales from 1 to 4 based on the level tier.
-*   **Multi-Path Solutions:** Equations are not fixed paths. For example, `? + ? = 8` can be solved by clicking 3 and 5, or 2 and 6.
-*   **Smart Progression:** 20 levels across 4 difficulty tiers. Early levels use blanks to reduce clicks; later levels introduce negative numbers, complex chains, and division.
-*   **Reward System:** Earn stars based on time and accuracy. Beating your personal best time grants a permanent bonus hint for all future levels.
-*   **Golden Apple Collection:** Every level won adds a slender, shiny golden apple to a 3D pyramid stack on the main menu.
-*   **Procedural Audio:** All sound effects are synthesized in real-time using the native Web Audio API (no external audio files).
-*   **Modern UI:** A sleek, non-rectangular interface with organic shapes, fluid animations, and a cinematic victory sequence.
+- **Normal Mode** — Solve equations by selecting numbers on rotating 3D cubes.
+- **Endless Mode** — Choose the correct answer from several choices. Questions become progressively more challenging.
 
-### 中文 (Traditional Chinese)
-*   **3D 空間益智：** 在完全可旋轉的 3D 空間中，與中空的 3x3x3 方塊（26 個方塊）進行互動。
-*   **動態方程式：** 解開遮罩方程式，支援混合運算符（+、-、×、÷）。運算符數量會根據關卡層級從 1 到 4 遞增。
-*   **多路徑解法：** 方程式沒有固定路徑。例如 `? + ? = 8` 可以透過點擊 3 和 5，或 2 和 6 來解答。
-*   **智能難度遞進：** 共 20 個關卡，分為 4 個難度層級。早期關卡會留白以減少點擊次數；後期關卡會引入負數、複雜鏈式運算和除法。
-*   **獎勵系統：** 根據時間和準確度賺取星星。打破個人最佳紀錄可為所有未來關卡永久增加額外提示。
-*   **金蘋果收集：** 每贏得一個關卡，都會在主選單的 3D 金字塔堆疊中增加一顆纖細閃亮的金蘋果。
-*   **程式化音效：** 所有音效均使用原生 Web Audio API 即時合成（無需外部音訊檔案）。
-*   **現代化 UI：** 流暢的非矩形介面，採用有機形狀、流體動畫，以及電影級的勝利過場動畫。
+### Current UI / Gameplay Features
 
----
+- Responsive layout for desktop, tablet and mobile screens.
+- Cyber visual theme using a focused **green → blue → purple** gradient rather than a seven-colour rainbow.
+- Large, high-contrast text intended to remain readable on smaller screens and for older players.
+- Home button available during gameplay.
+- Normal Mode cube rotation using left/right controls and automatic rotation after inactivity.
+- Normal Mode target warning uses the cube's own border: when three or more unresolved targets remain, the first unresolved cube can receive a flashing red border instead of an additional overlay or red dot.
+- Calculator display follows the selected language.
+- Assist drawer can be opened and closed from the Assist button.
+- Golden Apples are retained as the Normal Mode level-progress indicator.
+- Points system is shared by the game modes. The default maximum is 10 points.
+- Points Shop supports purchases using score.
+- Purchase confirmation shows the previous and new point totals.
+- Game sounds are generated with the browser Web Audio API; no external sound files are required.
+- Multiple interface languages are supported by the current UI, including English, Traditional Chinese, Simplified Chinese, Japanese and Korean.
+- Optional character/background PNG assets can be added without changing the core game logic.
 
-## How to Play
-
-### English
-1.  **Observe:** Look at the masked equation at the top of the screen (e.g., `? + ? × ? = 15`).
-2.  **Rotate:** Drag the mouse to rotate the 3D cube and find the numbers. You can also use the **Arrow Keys** or **WASD** to rotate the view.
-3.  **Deduce & Click:** Figure out which numbers fit the equation and click the corresponding blocks. The red dot indicates the starting block.
-4.  **Calculator Aid:** For equations with 3 or more numbers, a calculator sidebar will appear after you select two blocks, showing their running total to help you find the last number.
-5.  **Hints:** If you are stuck, click the hexagonal **HINT** button. It will highlight a correct block but adds a **10-second penalty** to your time. You start with 3 hints, plus 1 bonus hint for every personal record you break.
-6.  **Win:** Complete all rounds to trigger the golden apple cinematic. Your score, time, and stars will be saved.
-
-### 中文 (Traditional Chinese)
-1.  **觀察：** 查看螢幕上方的遮罩方程式（例如 `? + ? × ? = 15`）。
-2.  **旋轉：** 拖曳滑鼠旋轉 3D 方塊以尋找數字。您也可以使用 **方向鍵** 或 **WASD** 來旋轉視角。
-3.  **推導與點擊：** 找出符合方程式的數字，並點擊對應的方塊。紅點會指示起始方塊的位置。
-4.  **計算機輔助：** 對於包含 3 個或以上數字的方程式，當您選擇兩個方塊後，側邊欄會出現計算機，顯示目前的運算結果，幫助您找出最後一個數字。
-5.  **提示：** 如果卡關，請點擊六角形的 **HINT（提示）** 按鈕。它會高亮顯示一個正確的方塊，但會為您的時間增加 **10 秒的懲罰**。您初始擁有 3 次提示，每打破一次個人紀錄可額外獲得 1 次提示。
-6.  **勝利：** 完成所有回合即可觸發金蘋果過場動畫。您的分數、時間和星星將會被儲存。
-
----
-
-## Tech Stack
-
-*   **Rendering:** Three.js (r160)
-*   **Audio:** Native Web Audio API (Custom `AudioManager.js` chiptune synthesizer)
-*   **Language:** Vanilla JavaScript (ES Modules)
-*   **Styling:** CSS3 (Organic shapes, backdrop filters, animations)
-
----
-
-## Setup and Installation
-
-Because the game uses ES Modules (`import`), it cannot be run directly by opening the HTML file in a browser (the `file://` protocol blocks module loading). You must serve it via a local web server.
-
-### Option 1: Python (Easiest)
-If you have Python installed, open your terminal in the project folder and run:
-```bash
-# Python 3
-python3 -m http.server 5500
-
-# Python 2
-python -m SimpleHTTPServer 5500
-```
-Then open your browser and go to `http://localhost:5500`.
-
-### Option 2: Node.js (http-server)
-If you have Node.js installed:
-```bash
-npx http-server -p 5500
-```
-Then open your browser and go to `http://localhost:5500`.
-
-### Option 3: VS Code Live Server
-If you use Visual Studio Code, install the **Live Server** extension, right-click `index.html`, and select "Open with Live Server".
-
----
-
-## Project Structure
+### Project Structure
 
 ```text
-math-cube-puzzle/
-├── index.html          # Main game file (HTML, CSS, and Game Logic)
+math-cube-redone/
+├── index.html
+├── css/
+│   └── style.css
 ├── js/
-│   └── AudioManager.js # Procedural audio synthesizer
-└── README.md           # This file
+│   ├── main.js
+│   ├── game.js
+│   ├── three-setup.js
+│   ├── levelconfig.js
+│   ├── progress.js
+│   ├── apple.js
+│   ├── rounds.js
+│   ├── AudioManager.js
+│   ├── dom.js
+│   ├── i18n.js
+│   ├── utils.js
+│   └── secrets.js
+└── assets/
+    └── README.txt
 ```
 
+### Running Locally
+
+Because the project uses JavaScript modules and a Three.js import map, run it through a local web server rather than opening `index.html` directly with `file://`.
+
+For example:
+
+```bash
+python3 -m http.server 5500
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5500/
+```
+
+### GitHub Pages
+
+1. Upload the project files to a GitHub repository.
+2. Keep the `index.html`, `css/`, `js/` and `assets/` paths unchanged.
+3. Enable GitHub Pages for the repository.
+4. Open the published Pages URL in a modern browser.
+
+### Three.js
+
+The project currently loads Three.js 0.160.0 from jsDelivr through the import map in `index.html`. An internet connection is therefore required unless the Three.js modules are later bundled locally.
+
+### Optional Art Assets
+
+See `assets/README.txt` for the recommended PNG files. The game can run without those optional images.
+
+### Compatibility Notes
+
+The interface is designed to work across current desktop and mobile browsers. Touch and pointer interactions are used for controls, and the layout uses responsive viewport sizing and safe-area support where available.
+
+Avoid removing the original game modules unless their functionality is intentionally being replaced. Normal Mode contains the existing 3D game, level progression, scoring and Golden Apple systems.
+
 ---
 
-## Controls
+## 繁體中文（Big5 版本另見 README_BIG5.txt）
 
-*   **Mouse / Touch:** Drag to rotate the cube. Click to select blocks.
-*   **Keyboard:** 
-    *   `W` / `Up Arrow`: Rotate camera up.
-    *   `S` / `Down Arrow`: Rotate camera down.
-    *   `A` / `Left Arrow`: Rotate camera left.
-    *   `D` / `Right Arrow`: Rotate camera right.
-*   **UI:** Click the hexagonal buttons to use hints or navigate menus.
+Math Cube 是一個瀏覽器 3D 數學遊戲，適合桌面電腦、平板及手機瀏覽器使用。遊戲使用 HTML、CSS、JavaScript 及 Three.js 製作，可以直接部署到 GitHub Pages。
 
----
+### 主要模式
 
-## License
+- **普通模式** — 旋轉 3D 數字魔方，選擇數字完成算式。
+- **無盡模式** — 從多個答案中選出正確答案，題目會逐步增加難度。
 
-This project is open-source and available for educational and personal use.
+### 目前 UI 及遊戲功能
+
+- 支援桌面、平板及手機的響應式畫面。
+- 統一採用 **綠 → 藍 → 紫** 的 Cyber 漸變色，不使用七色彩虹配色。
+- 大字體及高對比度設計，方便小屏幕及年長玩家閱讀。
+- 遊戲進行中提供「首頁」按鈕。
+- 普通模式可使用左右按鈕旋轉魔方，停止操作一段時間後會自動旋轉。
+- 普通模式在有三個或以上未完成目標時，使用魔方本身的邊框作提示：第一個未完成目標會出現閃動紅色邊框，不再使用額外浮動紅框或紅點。
+- 計算機顯示會跟隨目前選擇的語言。
+- 「輔助」按鈕可以打開及關閉輔助抽屜。
+- 保留 Golden Apples（金色蘋果）作為普通模式的過關進度顯示。
+- 遊戲模式共用「點數」系統，預設上限為 10 點。
+- 「點數商店」可以使用分數購買點數。
+- 購買確認視窗會顯示購買前及購買後的點數。
+- 遊戲聲效使用瀏覽器 Web Audio API 產生，不需要額外音效檔案。
+- 目前介面支援英文、繁體中文、簡體中文、日文及韓文。
+- 可以加入額外角色及背景 PNG，不影響核心遊戲程式。
+
+### 專案結構
+
+```text
+math-cube-redone/
+├── index.html
+├── css/
+│   └── style.css
+├── js/
+│   ├── main.js
+│   ├── game.js
+│   ├── three-setup.js
+│   ├── levelconfig.js
+│   ├── progress.js
+│   ├── apple.js
+│   ├── rounds.js
+│   ├── AudioManager.js
+│   ├── dom.js
+│   ├── i18n.js
+│   ├── utils.js
+│   └── secrets.js
+└── assets/
+    └── README.txt
+```
+
+### 本機執行
+
+由於遊戲使用 JavaScript Modules 及 Three.js Import Map，不建議直接以 `file://` 開啟 `index.html`。請使用本機 Web Server。
+
+例如：
+
+```bash
+python3 -m http.server 5500
+```
+
+然後開啟：
+
+```text
+http://127.0.0.1:5500/
+```
+
+### GitHub Pages
+
+1. 將整個專案上載至 GitHub Repository。
+2. 保持 `index.html`、`css/`、`js/` 及 `assets/` 的路徑不變。
+3. 在 Repository 啟用 GitHub Pages。
+4. 使用現代瀏覽器開啟發布後的 Pages 網址。
+
+### Three.js
+
+目前專案透過 `index.html` 的 Import Map，從 jsDelivr 載入 Three.js 0.160.0。因此，如果日後沒有將 Three.js 模組改為本地檔案，遊戲需要互聯網連線才能載入 3D 引擎。
+
+### 可選圖像素材
+
+建議的 PNG 素材及尺寸請參閱 `assets/README.txt`。即使沒有這些可選圖片，遊戲仍然可以運作。
+
+### 相容性注意事項
+
+介面設計以目前常用的桌面及手機瀏覽器為目標。控制功能使用 Touch / Pointer 互動，並使用響應式 Viewport 尺寸及可用的 Safe Area 支援。
+
+除非準備正式取代原有功能，否則不應刪除原本的遊戲模組。普通模式仍然包含原有的 3D 遊戲、關卡進度、計分及 Golden Apples 系統。
