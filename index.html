@@ -1,82 +1,88 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
+<!doctype html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Math Cube Puzzle</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#101427">
+<title>Math Cube</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="loading">Loading 3D engine...</div>
 <div id="canvas-container"></div>
 
+<!-- NEW HOME -->
+<section id="mc-home" class="mc-screen mc-active">
+  <div class="mc-bg-glow"></div>
+  <header class="mc-topbar">
+    <button class="mc-icon-btn" id="mc-settings" aria-label="Language" data-mc-i18n="menu">MENU</button>
+    <div class="mc-wallet">
+      <div class="mc-wallet-stat"><span data-mc-i18n="score">SCORE</span><strong id="mc-score">0</strong></div>
+      <div class="mc-wallet-stat mc-home-heart"><span data-mc-i18n="points">POINTS</span><strong id="mc-hearts">(10)</strong></div>
+    </div>
+  </header>
+  <div class="mc-hero">
+    <div class="mc-hero-art" aria-hidden="true"></div>
+    <div class="mc-brand" data-mc-i18n="gameTitle">MATH CUBE</div>
+    <div class="mc-tagline" data-mc-i18n="tagline">Think fast. Choose smart.</div>
+  </div>
+  <div class="mc-mode-grid">
+    <button class="mc-mode-card mc-normal" id="mc-normal">
+      <span data-mc-i18n="classic">CLASSIC</span><strong data-mc-i18n="normalMode">NORMAL MODE</strong>
+      <small data-mc-i18n="normalDesc">Explore the 3D Math Cube.</small>
+    </button>
+    <button class="mc-mode-card mc-endless" id="mc-endless-btn">
+      <span data-mc-i18n="challenge">CHALLENGE</span><strong data-mc-i18n="endlessMode">ENDLESS MODE</strong>
+      <small data-mc-i18n="endlessDesc">Find the equation that is correct.</small>
+    </button>
+  </div>
+  <div class="mc-home-actions">
+    <button class="mc-small-btn" id="mc-shop" data-mc-i18n="pointsShop">POINTS SHOP</button>
+    <button class="mc-small-btn" id="mc-language" data-mc-i18n="language">LANGUAGE</button>
+  </div>
+</section>
+
+<!-- EXISTING NORMAL MODE UI; deliberately retained -->
 <div id="hud">
-    <div id="hud-back" class="hud-el">&#8592;</div>
-    <div id="hud-top">
-        <div class="pill" id="hud-level">LEVEL 1</div>
-        <div class="pill" id="hud-time">0.0s</div>
-        <div class="pill" id="hud-score">0</div>
-    </div>
-    <div id="hud-eq">? + ? = ?</div>
-    <div id="progress-pill"><div id="progress-fill"></div></div>
-    <div id="hud-msg">Fill the equation left-to-right. Arrows or WASD rotate.</div>
-    <div id="left-side">
-        <div id="hud-calc"><div class="cap">CALCULATOR</div><div id="calc-val"></div></div>
-        <div id="verify-panel"></div>
-    </div>
-    <div id="hint-wrap">
-        <div class="hstack" id="code-stack"><div id="code-btn" class="hud-el hexbtn hex">CODE</div></div>
-        <div class="hstack" id="verify-stack"><div id="verify-btn" class="hud-el hexbtn hex">VERIFY</div><div id="verify-count">3</div></div>
-        <div class="hstack"><div id="hud-hint" class="hud-el hexbtn hex">HINT</div><div id="hint-count">3</div></div>
-        <div class="hstack" id="adv-stack"><div id="adv-btn" class="hud-el hexbtn hex"><div class="hex in1"><div class="hex in2">HINT x2</div></div></div></div>
-    </div>
+  <div id="hud-back" class="hud-el" data-mc-i18n="home">HOME</div><button id="normal-assist-btn" type="button" class="normal-assist-btn">HELP</button>
+  <div id="hud-top"><div class="pill" id="hud-level">LEVEL 1</div><div class="pill" id="hud-time">0.0s</div><div class="pill" id="hud-score"><span id="hud-score-label">SCORE</span> <span id="hud-score-value">0</span></div><div class="pill" id="hud-hearts"><span id="hud-heart-label">POINTS</span> <span id="hud-hearts-value">(10)</span></div></div>
+  <div id="hud-eq">? + ? = ?</div><div id="cube-rotate-controls" aria-label="Rotate cubes left or right"><button type="button" id="cube-rotate-left" class="cube-rotate-arrow" aria-label="Rotate left">‹</button><button type="button" id="cube-rotate-right" class="cube-rotate-arrow" aria-label="Rotate right">›</button></div><div id="normal-correct-overlay" aria-live="polite"><div id="normal-completed-equation"></div><div id="normal-correct-label">Correct</div></div>
+  <div id="left-side"><div id="hud-calc"><div class="cap">CALCULATOR</div><div id="calc-val"></div></div><div id="verify-panel"></div></div>
+  <div id="hint-wrap" class="normal-hint-drawer"><button id="normal-assist-close" type="button" class="normal-assist-close" aria-label="Close">‹</button><div class="normal-hint-title" id="normal-hint-title">HELP</div><div class="hstack" id="code-stack"><div id="code-btn" class="hud-el hexbtn hex">CODE</div></div><div class="hstack" id="verify-stack"><div id="verify-btn" class="hud-el hexbtn hex">VERIFY</div><div id="verify-count">3</div></div><div class="hstack"><div id="hud-hint" class="hud-el hexbtn hex">HINT</div><div id="hint-count">3</div></div><div class="hstack" id="adv-stack"><div id="adv-btn" class="hud-el hexbtn hex"><div class="hex in1"><div class="hex in2">HINT x2</div></div></div></div></div>
 </div>
 
-<div class="screen" id="screen-select">
-    <div id="game-title">MATH CUBE</div>
-    <div id="game-sub">Observe the cube. Solve the equation.</div>
-    <div id="level-path"></div>
-    <div id="apple-badge"><div class="cnt" id="apple-count">0</div><div class="lbl">GOLDEN APPLES</div></div>
-    <div id="save-wrap"><div id="btn-export" class="savebtn">SAVE CODE</div><div id="btn-import" class="savebtn">LOAD CODE</div></div>
-</div>
-
-<div class="overlay" id="code-modal">
-    <div id="code-card">
-        <div id="code-title">ENTER CODE</div>
-        <input id="code-input" type="text" autocomplete="off" spellcheck="false">
-        <div id="code-msg"></div>
-        <div class="mrow">
-            <button class="mbtn" id="code-ok">OK</button>
-            <button class="mbtn" id="code-retry" style="display:none">RETRY</button>
-            <button class="mbtn" id="code-exit">EXIT</button>
-        </div>
-    </div>
-</div>
-
-<div class="overlay" id="adv-modal">
-    <div id="adv-card">
-        <div id="adv-msg"></div>
-        <div class="mrow"><button class="mbtn" id="adv-yes">YES</button><button class="mbtn" id="adv-no">NO</button></div>
-    </div>
-</div>
-
+<div class="screen" id="screen-select"><div id="game-title">MATH CUBE</div><div id="game-sub">Observe the cube. Solve the equation.</div><div id="level-path"></div><div id="apple-badge"><div class="cnt" id="apple-count">0</div><div class="lbl">GOLDEN APPLES</div></div><div id="save-wrap"><div id="btn-export" class="savebtn">SAVE CODE</div><div id="btn-import" class="savebtn">LOAD CODE</div></div></div>
+<div class="overlay" id="code-modal"><div id="code-card"><div id="code-title">ENTER CODE</div><input id="code-input" type="text" autocomplete="off" spellcheck="false"><div id="code-msg"></div><div class="mrow"><button class="mbtn" id="code-ok">OK</button><button class="mbtn" id="code-retry" style="display:none">RETRY</button><button class="mbtn" id="code-exit">EXIT</button></div></div></div>
+<div class="overlay" id="adv-modal"><div id="adv-card"><div id="adv-msg"></div><div class="mrow"><button class="mbtn" id="adv-yes">YES</button><button class="mbtn" id="adv-no">NO</button></div></div></div>
 <div class="screen" id="screen-result">
     <div id="result-card">
-        <div id="result-title">LEVEL CLEARED</div>
-        <div id="result-stars"></div>
-        <div id="result-stats"></div>
+        <div class="victory-glow"></div>
+        <div id="result-level">LEVEL 1</div>
+        <div id="result-title">LEVEL CLEARED!</div>
+        <div id="result-stars" aria-label="Stars"></div>
+        <div id="result-stats">
+            <div class="result-stat result-score-stat"><span class="result-stat-label">SCORE</span><strong id="result-score-value">0</strong></div>
+            <div class="result-stat result-time-stat"><span class="result-stat-label">TIME</span><strong id="result-time-value">0.0s</strong></div>
+        </div>
+        <div id="result-bonus"></div>
         <div id="result-phrases"></div>
-        <button class="rbtn" id="btn-menu">LEVELS</button>
-        <button class="rbtn" id="btn-next">NEXT</button>
+        <div class="result-buttons"><button class="rbtn" id="btn-menu">LEVELS</button><button class="rbtn" id="btn-next">NEXT</button></div>
     </div>
 </div>
 
-<script type="importmap">
-{ "imports": {
-    "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-} }
-</script>
+<!-- ENDLESS MODE -->
+<section id="mc-endless-screen" class="mc-screen">
+  <header class="mc-gamebar"><button class="mc-icon-btn" id="mc-endless-back" aria-label="Home" data-mc-i18n="home">HOME</button><div class="mc-game-stat"><span data-mc-i18n="question">QUESTION</span><b id="mc-qno">1</b></div><div class="mc-game-stat"><span data-mc-i18n="score">SCORE</span><b id="mc-run-score">0</b></div><div class="mc-heartbar"><span data-mc-i18n="points">POINTS</span> <b id="mc-run-hearts">(10)</b></div></header>
+  <div class="mc-question-area"><div class="mc-difficulty" id="mc-difficulty">STARTER</div><div class="mc-prompt" data-mc-i18n="whichCorrect">Which equation is correct?</div><div class="mc-equation" id="mc-equation">38 + 27 = ?</div><div class="mc-timebar"><div id="mc-time-fill"></div></div><div class="mc-time-text"><span id="mc-time-left">30.0</span>s</div></div>
+  <div class="mc-answers" id="mc-answers"></div>
+  <div class="mc-hintbar"><div class="mc-hint-heading" data-mc-i18n="hint">HINT</div><button class="mc-hint" data-hint="range"><span data-mc-i18n="answerRange">ANSWER RANGE</span><b id="mc-range">REMAINING 3</b></button><button class="mc-hint" data-hint="fifty"><span>50/50</span><b id="mc-fifty">REMAINING 2</b></button><button class="mc-hint" data-hint="primary"><span data-mc-i18n="askPrimary">ASK PRIMARY STUDENT</span><b id="mc-primary">REMAINING 2</b></button><button class="mc-hint" data-hint="high"><span data-mc-i18n="askSecondary">ASK SECONDARY STUDENT</span><b id="mc-high">REMAINING 2</b></button><button class="mc-hint" data-hint="audience"><span data-mc-i18n="askAudience">ASK THE AUDIENCE</span><b id="mc-audience">REMAINING 2</b></button></div>
+</section>
+<section id="mc-result" class="mc-modal"><div class="mc-result-card"><div class="mc-kicker" data-mc-i18n="runOver">RUN OVER</div><div class="mc-result-title" id="mc-result-title">QUESTION 1</div><div class="mc-result-score" id="mc-result-score">0</div><div class="mc-result-detail" id="mc-result-detail"></div><button class="mc-primary" id="mc-restart" data-mc-i18n="restart">RESTART</button><button class="mc-secondary" id="mc-result-home" data-mc-i18n="home">HOME</button></div></section>
+<section id="mc-hint-modal" class="mc-modal"><div class="mc-hint-card"><button class="mc-close" id="mc-hint-close">X</button><div id="mc-hint-visual"></div><div class="mc-hint-title" id="mc-hint-title"></div><div class="mc-hint-text" id="mc-hint-text"></div><div id="mc-audience-bars"></div></div></section>
+<section id="mc-language-modal" class="mc-modal"><div class="mc-hint-card"><button class="mc-close" id="mc-language-close">X</button><div class="mc-hint-title" data-mc-i18n="language">LANGUAGE</div><div class="mc-language-grid"><button data-lang="en">English</button><button data-lang="zh-Hant">繁體中文</button><button data-lang="zh-Hans">简体中文</button><button data-lang="ja">日本語</button><button data-lang="ko">한국어</button></div></div></section>
+<section id="mc-shop-modal" class="mc-modal"><div class="mc-shop-card"><button class="mc-close mc-shop-close" id="mc-shop-close" data-mc-i18n="close">CLOSE</button><div class="mc-shop-title" data-mc-i18n="pointsShop">POINTS SHOP</div><div class="mc-shop-wallet"><div><span data-mc-i18n="score">SCORE</span><strong id="mc-shop-score">0</strong></div><div><span data-mc-i18n="pointsWithMax">POINTS (MAX 10)</span><strong id="mc-shop-hearts">10</strong></div></div><div class="mc-shop-items"><button class="mc-shop-item" data-cost="1000" data-points="1"><span><strong>+1</strong> <em data-mc-i18n="points">POINTS</em></span><b>1,000</b></button><button class="mc-shop-item" data-cost="3000" data-points="3"><span><strong>+3</strong> <em data-mc-i18n="points">POINTS</em></span><b>3,000</b></button></div></div></section>
+<section id="mc-purchase-modal" class="mc-modal"><div class="mc-purchase-card"><button class="mc-close mc-purchase-close" id="mc-purchase-close" data-mc-i18n="close">CLOSE</button><div class="mc-purchase-title" id="mc-purchase-title">PURCHASE COMPLETE</div><div class="mc-heart-change"><div><span data-mc-i18n="currentPoints">CURRENT POINTS</span><strong id="mc-purchase-current">10</strong></div><div class="mc-heart-arrow">→</div><div><span data-mc-i18n="newPoints">NEW POINTS</span><strong id="mc-purchase-new">10</strong></div></div><div class="mc-purchase-detail" id="mc-purchase-detail"></div><button class="mc-purchase-ok" id="mc-purchase-ok" data-mc-i18n="close">CLOSE</button></div></section>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <script type="module" src="js/main.js"></script>
-</body>
-</html>
+</body></html>
