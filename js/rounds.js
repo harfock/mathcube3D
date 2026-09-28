@@ -42,15 +42,17 @@ export function makeFind(avail){
     }
     return null;
 }
-export function makeTexture(num){
+export function makeTexture(num,border='#00f5d4'){
     const c=document.createElement('canvas');c.width=128;c.height=128;const x=c.getContext('2d');
     const g=x.createLinearGradient(0,0,128,128);
     g.addColorStop(0,'#4361ee');
     g.addColorStop(1,'#3a0ca3');
     x.fillStyle=g;x.fillRect(0,0,128,128);
-    x.strokeStyle='#00f5d4';x.lineWidth=5;x.strokeRect(8,8,112,112);
+    x.strokeStyle=border;x.lineWidth=5;x.strokeRect(8,8,112,112);
     const s=String(num);x.fillStyle='#fff';x.textAlign='center';x.textBaseline='middle';
     x.font='bold '+(s.length<=2?56:s.length===3?44:34)+'px sans-serif';
     x.fillText(s,64,66);
-    return new THREE.CanvasTexture(c);
+    const tex=new THREE.CanvasTexture(c);
+    tex.needsUpdate=true;
+    return tex;
 }

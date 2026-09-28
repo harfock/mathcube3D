@@ -1,6 +1,6 @@
 import { THREE, scene, camera, renderer, controls, raycaster, mouse } from './three-setup.js';
 import { dom } from './dom.js';
-import { LANG, T } from './i18n.js';
+import { LANG, T, getLang, normalText } from './i18n.js';
 import { SECRET_BIN, SECRET2_BIN, fromBin } from './secrets.js';
 import { ri, pick, shuffle, easeOutBack, easeInOut } from './utils.js';
 import { progress, save, exportCode, importCode } from './progress.js';
@@ -15,11 +15,19 @@ addEventListener('keydown',()=>AudioFX.unlock());
 const MAXLVL=20;
 let currentLevel=1,cfg=null,blocks=[],blanks=[],anims=[],particles=[];
 let curRound=null,selected=[],roundIndex=0,totalRounds=0;
-let score=0,combo=0,wrongCount=0,penalty=0,hintsLeft=3,hintsUsed=0,startTime=0,playing=false;
+let score=0,combo=0,wrongCount=0,penalty=0,hintsLeft=3,hintsUsed=0,startTime=0,playing=false,failedLevel=false;
 let paused=false,pauseStart=0;
 let codeUsedRespect=false,codeUsedHumble=false,verifyUses=3,verifyTimer=0;
 let cubeGroup=null,apple=null,shadowCatcher=null,dot=null,dotBlock=null,dotActive=false;
-let camAnim=null,celebToken=0;
+let warningBlock=null,warningPulse=0,warningTextureState=null;
+let camAnim=null,focusAnim=null,celebToken=0;
+let persistentHintBlocks=new Set();
+let lastPlayerActionAt=performance.now();
+let idleRotate=false;
+let autoRotateRemaining=0;
+let arrowRotateDir=0;
+const AUTO_ROTATE_SPEED=0.20;
+const AUTO_ROTATE_CIRCLE=Math.PI*2;
 const keys={};
 const clock=new THREE.Clock();
 const sph=new THREE.Spherical();
@@ -29,15 +37,21 @@ function resumeGame(){ if(paused){startTime+=performance.now()-pauseStart;paused
 
 function clearLevel(){
     celebToken++;paused=false;
+    if(dom.hintWrap)dom.hintWrap.classList.remove('open');
     if(cubeGroup){scene.remove(cubeGroup);cubeGroup.traverse(o=>{if(o.geometry)o.geometry.dispose();});}
     if(apple){scene.remove(apple);apple=null;}
     if(shadowCatcher){scene.remove(shadowCatcher);shadowCatcher=null;}
     if(dot){scene.remove(dot);dot=null;}
+    warningBlock=null;warningPulse=0;warningTextureState=null;
     clearOrchard();
-    cubeGroup=null;blocks=[];blanks=[];anims=[];particles=[];selected=[];camAnim=null;
+    cubeGroup=null;blocks=[];blanks=[];anims=[];particles=[];selected=[];camAnim=null;focusAnim=null;persistentHintBlocks.clear();
 }
 function buildLevel(lv){
     clearLevel();
+    lastPlayerActionAt=performance.now();
+    idleRotate=false;
+    autoRotateRemaining=0;
+    arrowRotateDir=0;
     currentLevel=lv;cfg=levelConfig(lv);
     roundIndex=0;totalRounds=cfg.R;score=0;combo=0;wrongCount=0;penalty=0;
     hintsLeft=3+(progress.records||0);hintsUsed=0;
@@ -45,13 +59,24 @@ function buildLevel(lv){
     playing=true;startTime=performance.now();dotActive=false;
     dom.hud.classList.remove('dim');
     dom.hintBtn.classList.remove('off');dom.hintCount.textContent=hintsLeft;
-    dom.codeBtn.classList.remove('off');dom.codeBtn.textContent=T[LANG].code;
-    dom.verifyBtn.classList.remove('off');dom.verifyBtn.textContent=T[LANG].verify;dom.verifyCount.textContent=verifyUses;
+    dom.codeBtn.classList.remove('off');dom.codeBtn.textContent=normalText('code');
+    dom.verifyBtn.classList.remove('off');dom.verifyBtn.textContent=normalText('verify');dom.verifyCount.textContent=verifyUses;
     dom.verifyPanel.classList.remove('show');
     dom.codeStack.style.display=lv>=15?'flex':'none';
     dom.verifyStack.style.display=lv>=15?'flex':'none';
     dom.advStack.style.display=lv>=18?'flex':'none';
-    dom.hudLevel.textContent='LEVEL '+lv;dom.progressFill.style.width='0%';updateScore();
+    dom.hudLevel.textContent=getLang()==='zh'?`${normalText('level')}${lv}${normalText('levelSuffix')}`:`${normalText('level')} ${lv}`;
+    dom.hintBtn.textContent=normalText('hint');
+    dom.codeBtn.textContent=normalText('code');
+    dom.verifyBtn.textContent=normalText('verify');
+    dom.advBtn.querySelector('.in2').textContent=normalText('hintX2');
+    dom.hudBack.textContent=normalText('home');
+    if(dom.hudHearts){const h=Number(localStorage.getItem('mcHearts') ?? 10);const hv=document.getElementById('hud-hearts-value');if(hv)hv.textContent='('+h+')';else dom.hudHearts.textContent='('+h+')';}
+    dom.assistBtn.textContent=normalText('assist');
+    dom.assistClose.setAttribute('aria-label',normalText('closeAssist'));
+    dom.assistClose.title=normalText('closeAssist');
+    dom.hintTitle.textContent=normalText('assist');
+    updateScore();
     cubeGroup=new THREE.Group();scene.add(cubeGroup);
     const pos=[];
     for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++)
@@ -62,10 +87,15 @@ function buildLevel(lv){
         const p=new THREE.Vector3(pos[i][0]*sp,pos[i][1]*sp,pos[i][2]*sp);
         if(i<cfg.B){
             const num=ri(cfg.vmin,cfg.vmax);
-            const tex=makeTexture(num);
+            const tex=makeTexture(num,'#00f5d4');
+            const warningTex=makeTexture(num,'#ff2038');
             const mats=[];for(let k=0;k<6;k++)mats.push(new THREE.MeshStandardMaterial({map:tex,roughness:.3,metalness:.15}));
-            const m=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),mats);
-            m.position.copy(p);m.userData={num,consumed:false,base:p.clone()};
+            const geom=new THREE.BoxGeometry(1,1,1);
+            const m=new THREE.Mesh(geom,mats);
+            m.position.copy(p);
+            // The warning border is part of the cube face texture itself. No extra
+            // floating/overlaid border is attached to the rotating cube.
+            m.userData={num,consumed:false,base:p.clone(),baseTexture:tex,warningTexture:warningTex,warningRed:false};
             cubeGroup.add(m);blocks.push(m);
         } else {
             const m=new THREE.Mesh(new THREE.BoxGeometry(.9,.9,.9),
@@ -73,10 +103,8 @@ function buildLevel(lv){
             m.position.copy(p);cubeGroup.add(m);blanks.push(m);
         }
     }
-    dot=new THREE.Mesh(new THREE.SphereGeometry(.13,16,16),new THREE.MeshBasicMaterial({color:0xff2222}));
-    scene.add(dot);dot.visible=false;
+    dot=null;dotBlock=null;dotActive=false;warningBlock=null;warningPulse=0;warningTextureState=null;
     startRound();
-    if(curRound&&curRound.picked.length){dotBlock=curRound.picked[0];dotActive=true;dot.visible=true;}
     AudioFX.levelStart();
 }
 
@@ -92,13 +120,79 @@ function startRound(){
         let opsCount=Math.max(1,Math.min(ri(cfg.opsRange[0],cfg.opsRange[1]),avail.length-1));
         round=makeMain(avail,opsCount,cfg.opsSet);
     }
-    curRound=round;selected=[];updateEq();
+    curRound=round;selected=[];persistentHintBlocks.clear();warningBlock=null;warningPulse=0;updateEq();updateWarningTarget();
+    lastPlayerActionAt=performance.now();
+    idleRotate=false;
+    autoRotateRemaining=0;
 }
 
+function fitHudEquation(){
+    const el=dom.hudEq;
+    if(!el)return;
+    // Prefer one line. Only reduce the large question font when the full equation
+    // cannot fit inside its responsive 25–50vw question area.
+    el.style.whiteSpace='nowrap';
+    el.style.fontSize='';
+    const maxPx=Math.max(44,Math.min(86,window.innerWidth*0.11));
+    let size=maxPx;
+    el.style.fontSize=size+'px';
+    const available=Math.max(80,el.clientWidth-36);
+    while(el.scrollWidth>available && size>30){
+        size-=1;
+        el.style.fontSize=size+'px';
+    }
+    // Extremely long equations may still need two lines; never clip them.
+    if(el.scrollWidth>available){
+        el.style.whiteSpace='normal';
+        el.style.overflowWrap='anywhere';
+    }
+}
+
+window.addEventListener('resize',()=>{ if(playing) fitHudEquation(); });
+
+function notePlayerAction(){
+    lastPlayerActionAt=performance.now();
+    idleRotate=false;
+    autoRotateRemaining=0;
+    if(focusAnim){focusAnim=null;controls.enabled=true;}
+}
+
+function rotateCameraHorizontal(direction,dt,speed=2.2){
+    sph.setFromVector3(camera.position);
+    sph.theta += direction*speed*dt;
+    sph.phi=Math.PI/2;
+    camera.position.setFromSpherical(sph);
+    camera.lookAt(0,0,0);
+}
+
+function focusCameraOnBlock(block,duration=900){
+    if(!block||!playing)return;
+    sph.setFromVector3(camera.position);
+    const targetTheta=Math.atan2(block.position.z,block.position.x);
+    let delta=targetTheta-sph.theta;
+    while(delta>Math.PI)delta-=Math.PI*2;
+    while(delta<-Math.PI)delta+=Math.PI*2;
+    focusAnim={t0:performance.now(),duration,theta0:sph.theta,theta1:sph.theta+delta,radius:sph.radius};
+    controls.enabled=false;
+}
+
+
+function positionNormalHints(){
+    const wrap=document.getElementById('hint-wrap'), eq=document.getElementById('hud-eq');
+    if(!wrap||!eq)return;
+    const r=eq.getBoundingClientRect();
+    const desired=r.bottom+18;
+    const minTop=96;
+    const maxTop=Math.max(minTop,window.innerHeight-wrap.offsetHeight-28);
+    wrap.style.top=Math.min(desired,maxTop)+'px';
+}
+window.addEventListener('resize',()=>requestAnimationFrame(positionNormalHints));
+
 function updateEq(){
-    const r=curRound;if(!r){dom.hudEq.textContent='';updateCalc();return;}
+    const r=curRound;if(!r){dom.hudEq.textContent='';dom.hudEq.style.fontSize='';dom.hudEq.style.whiteSpace='nowrap';updateCalc();return;}
     const s=selected.map(b=>b.userData.num);
-    const f=i=>s[i]!==undefined?s[i]:'?';
+    const qm=getLang()==='en'?'?':'？';
+    const f=i=>s[i]!==undefined?s[i]:qm;
     let txt='';
     if(r.type==='MAIN'){
         for(let i=0;i<r.k;i++){txt+=f(i);if(i<r.ops.length)txt+=' '+r.ops[i]+' ';}
@@ -107,7 +201,16 @@ function updateEq(){
     else if(r.type==='MISSING')txt=`${r.given} ${r.op} ${f(0)} = ${r.target}`;
     else if(r.type==='FIND')txt=`${r.givenA} ${r.op} ${r.givenB} = ${f(0)}`;
     dom.hudEq.textContent=txt;
+    fitHudEquation();
+    positionNormalHints();
     updateCalc();
+}
+function updateWarningTarget(){
+    if(warningBlock)setWarningTexture(warningBlock,false);
+    warningBlock=null;
+    if(!curRound||curRound.k<3)return;
+    const remaining=curRound.picked.filter(b=>!b.userData.consumed);
+    if(remaining.length>=3)warningBlock=remaining[0];
 }
 function updateCalc(){
     if(curRound&&curRound.type==='MAIN'&&curRound.k>=3&&selected.length>=2){
@@ -129,8 +232,23 @@ function evalRound(vals){
     if(r.type==='MISSING'||r.type==='FIND')return vals[0]===r.needed;
     return false;
 }
+function forEachMaterial(mesh,fn){
+    if(!mesh||!mesh.material)return;
+    const list=Array.isArray(mesh.material)?mesh.material:[mesh.material];
+    list.forEach(m=>{if(m)fn(m);});
+}
 function setGlow(b,on,color){
-    b.material.forEach(m=>{m.emissive=new THREE.Color(on?(color||0xffd700):0x000000);m.emissiveIntensity=on?0.55:0;});
+    forEachMaterial(b,m=>{
+        if('emissive' in m)m.emissive=new THREE.Color(on?(color||0xffd700):0x000000);
+        if('emissiveIntensity' in m)m.emissiveIntensity=on?0.55:0;
+    });
+}
+function setWarningTexture(b,red){
+    if(!b||!b.userData)return;
+    if(b.userData.warningRed===red)return;
+    b.userData.warningRed=red;
+    const tex=red?b.userData.warningTexture:b.userData.baseTexture;
+    forEachMaterial(b,m=>{if(m.map!==tex){m.map=tex;m.needsUpdate=true;}});
 }
 
 renderer.domElement.addEventListener('click',e=>{
@@ -140,29 +258,79 @@ renderer.domElement.addEventListener('click',e=>{
     const hit=raycaster.intersectObjects(blocks.filter(b=>!b.userData.consumed));
     if(!hit.length)return;
     const mesh=hit[0].object;
-    if(dotActive&&mesh===dotBlock){dotActive=false;dot.visible=false;}
+    notePlayerAction();
     const idx=selected.indexOf(mesh);
-    if(idx>=0){selected.splice(idx,1);setGlow(mesh,false,0x00f5d4);AudioFX.blockDeselect();updateEq();return;}
-    selected.push(mesh);setGlow(mesh,true,0x00f5d4);AudioFX.blockSelect();updateEq();
+    if(idx>=0){selected.splice(idx,1);if(!persistentHintBlocks.has(mesh))setGlow(mesh,false,0x00f5d4);else setGlow(mesh,true,0xffd54a);AudioFX.blockDeselect();updateEq();return;}
+    selected.push(mesh);setGlow(mesh,true,0x00f5d4);AudioFX.blockSelect();updateEq();updateWarningTarget();
     if(selected.length===curRound.k){
         if(evalRound(selected.map(b=>b.userData.num)))roundSuccess();else roundFail();
     }
 });
+function showNormalCorrect(solvedSelection){
+    const overlay=document.getElementById('normal-correct-overlay');
+    const equation=document.getElementById('normal-completed-equation');
+    const label=document.getElementById('normal-correct-label');
+    if(!overlay||!equation||!label)return;
+
+    // Build the completed equation from the exact numbers the player just selected.
+    // Do not use r.picked here: that is the internally generated solution order,
+    // which can differ from the player's actual selection order.
+    const r=curRound;
+    if(!r)return;
+    const chosen=Array.isArray(solvedSelection)?solvedSelection:[];
+    let text='';
+    if(r.type==='MAIN'){
+        const vals=chosen.map(b=>b.userData.num);
+        for(let i=0;i<vals.length;i++){
+            text+=vals[i];
+            if(i<r.ops.length)text+=' '+r.ops[i]+' ';
+        }
+        text+=' = '+r.target;
+    }else if(r.type==='MISSING'){
+        const pickedValue=chosen[0]?.userData?.num ?? r.needed;
+        text=`${r.given} ${r.op} ${pickedValue} = ${r.target}`;
+    }else if(r.type==='FIND'){
+        const pickedValue=chosen[0]?.userData?.num ?? r.needed;
+        text=`${r.givenA} ${r.op} ${r.givenB} = ${pickedValue}`;
+    }
+    equation.textContent=text;
+    label.textContent=normalText('correct');
+    overlay.classList.remove('show','fade');
+    void overlay.offsetWidth;
+    overlay.classList.add('show');
+}
+
+function hideNormalCorrect(){
+    const overlay=document.getElementById('normal-correct-overlay');
+    if(!overlay)return;
+    overlay.classList.add('fade');
+    setTimeout(()=>overlay.classList.remove('show','fade'),420);
+}
+
 function roundSuccess(){
+    // Preserve the player's exact selection/order before selected[] is cleared.
+    const solvedSelection=[...selected];
     const k=curRound.k;
     score+=100*k+combo*25;combo++;
-    selected.forEach(b=>{b.userData.consumed=true;setGlow(b,false);
+    selected.forEach(b=>{b.userData.consumed=true;setGlow(b,false);persistentHintBlocks.delete(b);
         anims.push({mesh:b,start:performance.now(),from:b.position.clone(),to:b.position.clone().multiplyScalar(.08)});});
     selected=[];roundIndex++;
-    dom.progressFill.style.width=(roundIndex/totalRounds*100)+'%';
     updateScore();updateCalc();flashEq('good');AudioFX.roundSuccess();
-    if(roundIndex===1){dotActive=false;if(dot)dot.visible=false;}
-    if(roundIndex>=totalRounds){setTimeout(finish,600);}else setTimeout(startRound,380);
+    updateWarningTarget();
+
+    // Give the player a large, high-contrast confirmation before continuing.
+    showNormalCorrect(solvedSelection);
+    if(roundIndex>=totalRounds){
+        setTimeout(()=>{hideNormalCorrect();setTimeout(finish,420);},2000);
+    }else{
+        setTimeout(()=>{hideNormalCorrect();setTimeout(startRound,420);},2000);
+    }
 }
 function roundFail(){
     wrongCount++;combo=0;penalty+=3;
-    selected.forEach(b=>{setGlow(b,false);shake(b);});
-    selected=[];updateEq();flashEq('bad');AudioFX.roundFail();
+    if(wrongCount>=3){ setTimeout(failLevel,450); return; }
+    selected.forEach(b=>{if(!persistentHintBlocks.has(b))setGlow(b,false);else setGlow(b,true,0xffd54a);shake(b);});
+    selected=[];updateEq();updateWarningTarget();flashEq('bad');AudioFX.roundFail();
 }
 function flashEq(cls){dom.hudEq.classList.add(cls);setTimeout(()=>dom.hudEq.classList.remove(cls),400);}
 function shake(b){
@@ -171,11 +339,32 @@ function shake(b){
         if(e<320){b.position.x=bx+Math.sin(e*.08)*.06;requestAnimationFrame(anim);}else b.position.x=bx;};
     anim();
 }
-function updateScore(){dom.hudScore.textContent=score;}
+function updateScore(){const v=document.getElementById('hud-score-value');if(v)v.textContent=score;else dom.hudScore.textContent=score;}
 function timePopup(text){
     const el=document.createElement('div');el.className='time-pop';el.textContent=text;
     document.body.appendChild(el);setTimeout(()=>el.remove(),1100);
 }
+
+function showHintTarget(blocksToShow, persistent=false){
+    const targets=(blocksToShow||[]).filter(Boolean);
+    if(!targets.length)return;
+    if(persistent)targets.forEach(b=>persistentHintBlocks.add(b));
+    targets.forEach(b=>setGlow(b,true,0xffd54a));
+    focusCameraOnBlock(targets[0]);
+    if(!persistent){
+        setTimeout(()=>targets.forEach(b=>{if(!b.userData.consumed)setGlow(b,false);}),2200);
+    }
+}
+
+dom.assistBtn.addEventListener('click',()=>{
+    if(!playing||paused)return;
+    AudioFX.button();
+    if(dom.hintWrap.classList.contains('open')){ dom.hintWrap.classList.remove('open'); return; }
+    dom.hintWrap.classList.add('open');
+    dom.hintTitle.textContent=normalText('assist');
+    requestAnimationFrame(positionNormalHints);
+});
+dom.assistClose.addEventListener('click',()=>{AudioFX.button();dom.hintWrap.classList.remove('open');});
 
 dom.hintBtn.addEventListener('click',()=>{
     if(!playing||paused||hintsLeft<=0||!curRound)return;
@@ -185,10 +374,12 @@ dom.hintBtn.addEventListener('click',()=>{
     if(hintsLeft===0)dom.hintBtn.classList.add('off');
     timePopup('+10s');AudioFX.hint();
     const t=curRound.picked.find(b=>!b.userData.consumed)||curRound.picked[0];
-    if(t){setGlow(t,true);setTimeout(()=>{if(!t.userData.consumed)setGlow(t,false);},1000);}
+    showHintTarget(t?[t]:[],false);
+    dom.hintWrap.classList.remove('open');
 });
 
 dom.verifyBtn.addEventListener('click',()=>{
+    dom.hintWrap.classList.remove('open');
     if(!playing||paused||verifyUses<=0||currentLevel<15||!curRound)return;
     if(selected.length===0)return;
     verifyUses--;dom.verifyCount.textContent=verifyUses;
@@ -208,10 +399,11 @@ dom.verifyBtn.addEventListener('click',()=>{
 });
 
 dom.codeBtn.addEventListener('click',()=>{
+    dom.hintWrap.classList.remove('open');
     if(!playing||paused||(codeUsedRespect&&codeUsedHumble)||currentLevel<15)return;
     AudioFX.button();
-    dom.codeTitle.textContent=T[LANG].enter;
-    dom.codeOk.textContent=T[LANG].ok;dom.codeRetry.textContent=T[LANG].retry;dom.codeExit.textContent=T[LANG].exit;
+    dom.codeTitle.textContent=normalText('enter');
+    dom.codeOk.textContent=normalText('ok');dom.codeRetry.textContent=normalText('retry');dom.codeExit.textContent=normalText('exit');
     dom.codeMsg.textContent='';dom.codeRetry.style.display='none';dom.codeInput.value='';
     pauseGame();
     dom.codeModal.classList.add('active');
@@ -221,18 +413,18 @@ function closeCode(){ dom.codeModal.classList.remove('active'); resumeGame(); }
 dom.codeOk.addEventListener('click',()=>{
     const val=dom.codeInput.value.trim().toLowerCase();
     if(val===fromBin(SECRET_BIN)){
-        if(codeUsedRespect){dom.codeMsg.textContent=T[LANG].used;dom.codeRetry.style.display='inline-block';return;}
+        if(codeUsedRespect){dom.codeMsg.textContent=normalText('used');dom.codeRetry.style.display='inline-block';return;}
         codeUsedRespect=true;
         hintsLeft+=3;dom.hintCount.textContent=hintsLeft;
         if(hintsLeft>0)dom.hintBtn.classList.remove('off');
-        timePopup(T[LANG].plus3);AudioFX.record();
+        timePopup(normalText('plus3'));AudioFX.record();
     } else if(val===fromBin(SECRET2_BIN)){
-        if(codeUsedHumble){dom.codeMsg.textContent=T[LANG].used;dom.codeRetry.style.display='inline-block';return;}
+        if(codeUsedHumble){dom.codeMsg.textContent=normalText('used');dom.codeRetry.style.display='inline-block';return;}
         codeUsedHumble=true;
         verifyUses=3;dom.verifyCount.textContent=3;dom.verifyBtn.classList.remove('off');
-        timePopup(T[LANG].plusV);AudioFX.record();
+        timePopup(normalText('plusV'));AudioFX.record();
     } else {
-        dom.codeMsg.textContent=T[LANG].wrong;dom.codeRetry.style.display='inline-block';
+        dom.codeMsg.textContent=normalText('wrong');dom.codeRetry.style.display='inline-block';
         AudioFX.roundFail();return;
     }
     if(codeUsedRespect&&codeUsedHumble)dom.codeBtn.classList.add('off');
@@ -245,15 +437,16 @@ dom.codeRetry.addEventListener('click',()=>{
 dom.codeExit.addEventListener('click',()=>{AudioFX.button();closeCode();});
 
 dom.advBtn.addEventListener('click',()=>{
+    dom.hintWrap.classList.remove('open');
     if(!playing||paused||currentLevel<18)return;
     AudioFX.button();pauseGame();
     if(hintsLeft<2){
-        dom.advMsg.textContent=T[LANG].need2(hintsLeft);
-        dom.advYes.style.display='none';dom.advNo.textContent=T[LANG].ok;
+        dom.advMsg.textContent=normalText('need2',hintsLeft);
+        dom.advYes.style.display='none';dom.advNo.textContent=normalText('ok');
     } else {
-        dom.advMsg.textContent=T[LANG].confirm;
+        dom.advMsg.textContent=normalText('confirm');
         dom.advYes.style.display='inline-block';
-        dom.advYes.textContent=T[LANG].yes;dom.advNo.textContent=T[LANG].no;
+        dom.advYes.textContent=normalText('yes');dom.advNo.textContent=normalText('no');
     }
     dom.advModal.classList.add('active');
 });
@@ -265,21 +458,22 @@ dom.advYes.addEventListener('click',()=>{
     if(hintsLeft===0)dom.hintBtn.classList.add('off');
     AudioFX.hint();
     const targets=curRound?curRound.picked.filter(b=>!b.userData.consumed):[];
-    targets.forEach(b=>setGlow(b,true));
-    setTimeout(()=>{targets.forEach(b=>{if(!b.userData.consumed)setGlow(b,false);});},3000);
+    showHintTarget(targets,true);
+    dom.hintWrap.classList.remove('open');
     closeAdv();
 });
 dom.advNo.addEventListener('click',()=>{AudioFX.button();closeAdv();});
 
 function finish(){
     if(!playing)return;
-    playing=false;if(dot)dot.visible=false;
+    playing=false;warningBlock=null;if(dot)dot.visible=false;
     dom.hud.classList.add('dim');
     controls.enabled=false;controls.autoRotate=false;
     const elapsed=(performance.now()-startTime)/1000,total=elapsed+penalty,par=cfg.par;
     const timeBonus=Math.max(0,Math.round((par*2-total)*10));
     const perfect=wrongCount===0?500:0,noHint=hintsUsed===0?300:0;
     const finalScore=score+timeBonus+perfect+noHint;
+    try{localStorage.setItem('mcScore',String(Number(localStorage.getItem('mcScore')||0)+finalScore));}catch(e){}
     let stars=1;
     if(wrongCount===0&&total<=par*1.2)stars=3;
     else if(wrongCount<=1&&total<=par*2)stars=2;
@@ -333,31 +527,107 @@ function spawnApple(){
     scene.add(shadowCatcher);
 }
 
-function showResult(stars,fs,total,tb,pf,nh,rec){
+
+function failLevel(){
+    if(!playing)return;
+    playing=false;if(dot)dot.visible=false;controls.enabled=false;controls.autoRotate=false;
+    failedLevel=true;dom.hud.classList.remove('active');
+    dom.screenResult.classList.remove('victory-result');
     dom.screenResult.classList.add('active');
+    dom.screenResult.querySelector('#result-title').textContent=normalText('levelFailed');
+    dom.screenResult.querySelector('#result-level').textContent='';
+    dom.screenResult.querySelector('#result-bonus').textContent='';
+    dom.screenResult.querySelector('#result-stars').innerHTML='';
+    dom.screenResult.querySelector('#result-stats').innerHTML=normalText('failedStats');
+    dom.screenResult.querySelector('#result-phrases').innerHTML='';
+    dom.btnNext.style.display='inline-block';dom.btnNext.textContent=normalText('restartLevel');dom.btnMenu.textContent=normalText('home');
+}
+
+function showResult(stars,fs,total,tb,pf,nh,rec){
+    failedLevel=false;
+    dom.screenResult.classList.add('active','victory-result');
+    dom.screenResult.querySelector('#result-title').textContent=normalText('levelCleared');
+    const card=dom.screenResult.querySelector('#result-card');
+    card.classList.remove('victory-enter');
+    void card.offsetWidth;
+    card.classList.add('victory-enter');
+
+    const levelEl=dom.screenResult.querySelector('#result-level');
+    const scoreEl=dom.screenResult.querySelector('#result-score-value');
+    const timeEl=dom.screenResult.querySelector('#result-time-value');
+    const bonusEl=dom.screenResult.querySelector('#result-bonus');
+    levelEl.textContent=getLang()==='zh'?`${normalText('level')}${currentLevel}${normalText('levelSuffix')}`:`${normalText('level')} ${currentLevel}`;
+    scoreEl.textContent='0';
+    timeEl.textContent=`0.0${normalText('seconds')}`;
+    bonusEl.textContent='';
+
     const sc=dom.screenResult.querySelector('#result-stars');sc.innerHTML='';
-    for(let i=0;i<3;i++){const s=document.createElement('div');s.className='bigstar'+(i<stars?' on':'');
-        s.style.animationDelay=(i*.25)+'s';sc.appendChild(s);}
-    dom.screenResult.querySelector('#result-stats').innerHTML='Score: '+fs+'<br>Time: '+total.toFixed(1)+'s &nbsp;(time bonus +'+tb+')'+
-        (pf?'<br>Perfect +'+pf:'')+(nh?' &nbsp; No hint +'+nh:'')+
-        (rec?'<br><span class="rec-line">NEW RECORD! +1 bonus hint earned</span>':'');
-    if(rec)setTimeout(()=>AudioFX.record(),400);
-    const ph=dom.screenResult.querySelector('#result-phrases');ph.innerHTML='';
-    PHRASES.forEach((p,i)=>{const d=document.createElement('div');d.className='phrase';d.textContent=p;
-        ph.appendChild(d);setTimeout(()=>d.classList.add('show'),i*110);});
+    for(let i=0;i<3;i++){
+        const star=document.createElement('div');
+        star.className='bigstar'+(i<stars?' on':'');
+        star.style.animationDelay=(0.35+i*.22)+'s';
+        sc.appendChild(star);
+    }
+
+    // Count the score and time up after the main victory moment.
+    setTimeout(()=>animateNumber(scoreEl,fs,650),650);
+    setTimeout(()=>animateTime(timeEl,total,650),700);
+
+    const bonus=[];
+    if(pf)bonus.push(normalText('perfect')+' +'+pf);
+    if(nh)bonus.push(normalText('noHint')+' +'+nh);
+    if(rec)bonus.push(normalText('newRecord'));
+    bonusEl.textContent=bonus.join('  ·  ');
+    if(rec)setTimeout(()=>AudioFX.record(),850);
+
+    const shortPhrases={
+        zh:['太棒了！','做得好！','漂亮！','又完成一關！','數學小高手！','繼續挑戰！','你做到了！','精彩！'],
+        en:['Great job!','Well done!','Excellent!','Another one cleared!','Math star!','Keep going!','You did it!','Fantastic!'],
+        ja:['すごい！','よくできました！','素晴らしい！','また1レベルクリア！','数学の達人！','この調子！','できました！','最高です！'],
+        ko:['대단해요!','잘했어요!','훌륭해요!','또 한 레벨 완료!','수학 고수예요!','계속 도전하세요!','해냈어요!','최고예요!']
+    };
+    const pool=shortPhrases[getLang()]||shortPhrases.en;
+    const ph=dom.screenResult.querySelector('#result-phrases');
+    ph.innerHTML='';
+    const d=document.createElement('div');
+    d.className='phrase';
+    d.textContent=pool[Math.floor(Math.random()*pool.length)];
+    ph.appendChild(d);
+    setTimeout(()=>d.classList.add('show'),900);
+
     dom.btnNext.style.display=currentLevel<MAXLVL?'inline-block':'none';
 }
-dom.btnNext.addEventListener('click',()=>{AudioFX.button();dom.screenResult.classList.remove('active');startLevel(currentLevel+1);});
-dom.btnMenu.addEventListener('click',()=>{AudioFX.button();dom.screenResult.classList.remove('active');clearLevel();dom.hud.classList.remove('active');showSelect();});
-dom.hudBack.addEventListener('click',()=>{AudioFX.button();playing=false;clearLevel();dom.hud.classList.remove('active');showSelect();});
+function animateNumber(el,target,duration){
+    const start=performance.now();
+    function tick(now){
+        const p=Math.min(1,(now-start)/duration);
+        const eased=1-Math.pow(1-p,3);
+        el.textContent=Math.round(target*eased).toLocaleString();
+        if(p<1)requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+}
+function animateTime(el,target,duration){
+    const start=performance.now();
+    function tick(now){
+        const p=Math.min(1,(now-start)/duration);
+        const eased=1-Math.pow(1-p,3);
+        el.textContent=(target*eased).toFixed(1)+normalText('seconds');
+        if(p<1)requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+}
+dom.btnNext.addEventListener('click',()=>{AudioFX.button();if(failedLevel){const h=Number(localStorage.getItem('mcHearts') ?? 10);if(h<=0){window.dispatchEvent(new Event('mathcube-home'));return;}localStorage.setItem('mcHearts',String(h-1));const hv=document.getElementById('hud-hearts-value');if(hv)hv.textContent='('+(h-1)+')';else if(dom.hudHearts)dom.hudHearts.textContent='('+(h-1)+')';dom.screenResult.classList.remove('active');startLevel(currentLevel);failedLevel=false;return;}dom.screenResult.classList.remove('active');startLevel(currentLevel+1);});
+dom.btnMenu.addEventListener('click',()=>{AudioFX.button();dom.screenResult.classList.remove('active');clearLevel();dom.hud.classList.remove('active');dom.btnNext.textContent=normalText('next');dom.btnMenu.textContent=normalText('levels');window.dispatchEvent(new Event('mathcube-home'));});
+dom.hudBack.addEventListener('click',()=>{AudioFX.button();playing=false;clearLevel();dom.hud.classList.remove('active');window.dispatchEvent(new Event('mathcube-home'));});
 
-dom.btnExport.addEventListener('click',()=>{AudioFX.button();prompt(T[LANG].saveDone,exportCode());});
+dom.btnExport.addEventListener('click',()=>{AudioFX.button();prompt(normalText('saveDone'),exportCode());});
 dom.btnImport.addEventListener('click',()=>{
     AudioFX.button();
-    const code=prompt(T[LANG].load,'');
+    const code=prompt(normalText('load'),'');
     if(code===null||code==='')return;
-    if(importCode(code)){timePopup(T[LANG].loadOk);showSelect();}
-    else timePopup(T[LANG].loadBad);
+    if(importCode(code)){timePopup(normalText('loadOk'));showSelect();}
+    else timePopup(normalText('loadBad'));
 });
 
 function menuCamera(){
@@ -365,12 +635,37 @@ function menuCamera(){
     camera.position.set(portrait?5.2:6.2,portrait?2.6:3.2,portrait?9.4:8.2);
     camera.lookAt(0,0,0);
 }
-function showSelect(){
+
+function applyNormalLanguage(){
+    const zh=getLang()==='zh';
+    const set=(id,key)=>{const el=document.getElementById(id);if(el)el.textContent=normalText(key);};
+    set('hud-back','home'); set('hud-hint','hint'); set('code-btn','code'); set('verify-btn','verify'); set('hud-heart-label','points'); set('hud-score-label','score'); const calcCap=document.querySelector('#hud-calc .cap'); if(calcCap)calcCap.textContent=normalText('calculator');
+    const adv=document.querySelector('#adv-btn .in2'); if(adv)adv.textContent=normalText('hintX2');
+    const gt=document.getElementById('game-title'); if(gt)gt.textContent=normalText('gameTitle');
+    const gs=document.getElementById('game-sub'); if(gs)gs.textContent=normalText('gameSub');
+    const apples=document.querySelector('#apple-badge .lbl'); if(apples)apples.textContent=normalText('goldenApples');
+    const ex=document.getElementById('btn-export'); if(ex)ex.textContent=normalText('save');
+    const im=document.getElementById('btn-import'); if(im)im.textContent=normalText('load');
+    const ok=document.getElementById('code-ok'); if(ok)ok.textContent=normalText('ok');
+    const retry=document.getElementById('code-retry'); if(retry)retry.textContent=normalText('retry');
+    const exit=document.getElementById('code-exit'); if(exit)exit.textContent=normalText('exit');
+    const yes=document.getElementById('adv-yes'); if(yes)yes.textContent=normalText('yes');
+    const no=document.getElementById('adv-no'); if(no)no.textContent=normalText('no');
+    const rl=document.getElementById('result-level'); if(rl && currentLevel) rl.textContent=zh?`${normalText('level')}${currentLevel}${normalText('levelSuffix')}`:`${normalText('level')} ${currentLevel}`;
+    const rt=document.querySelector('.result-score-stat .result-stat-label'); if(rt)rt.textContent=normalText('score');
+    const rtime=document.querySelector('.result-time-stat .result-stat-label'); if(rtime)rtime.textContent=normalText('time');
+    const next=document.getElementById('btn-next'); if(next && !failedLevel)next.textContent=normalText('next');
+    const menu=document.getElementById('btn-menu'); if(menu)menu.textContent=normalText('levels');
+}
+window.addEventListener('mathcube-language-changed',()=>{applyNormalLanguage(); if(playing) buildLevel(currentLevel);});
+
+export function showSelect(){
+    applyNormalLanguage();
     controls.enabled=true;controls.autoRotate=false;camAnim=null;
     controls.target.set(0,0,0);
     menuCamera();
     dom.screenSelect.classList.add('active');
-    dom.btnExport.textContent=T[LANG].save;dom.btnImport.textContent=T[LANG].load;
+    dom.btnExport.textContent=normalText('save');dom.btnImport.textContent=normalText('load');
     dom.levelPath.innerHTML='';
     for(let lv=1;lv<=MAXLVL;lv++){
         const locked=lv>progress.unlocked;
@@ -386,10 +681,12 @@ function showSelect(){
     try{buildOrchard();}catch(err){console.warn('orchard skipped:',err);}
 }
 function startLevel(lv){
-    dom.hud.classList.add('active');dom.screenSelect.classList.remove('active');dom.screenResult.classList.remove('active');
-    controls.enabled=true;controls.autoRotate=true;
+    dom.hud.classList.add('active');
+    if(dom.hudHearts){const h=Math.min(10,Math.max(0,Number(localStorage.getItem('mcHearts') ?? 10)));const hv=document.getElementById('hud-hearts-value');if(hv)hv.textContent='('+h+')';else dom.hudHearts.textContent='('+h+')';}
+    dom.screenSelect.classList.remove('active');dom.screenResult.classList.remove('active');
+    controls.enabled=true;controls.autoRotate=false;
     controls.target.set(0,0,0);
-    camera.position.set(7,5,7);camera.lookAt(0,0,0);
+    camera.position.set(7,0,7);camera.lookAt(0,0,0);
     buildLevel(lv);
 }
 
@@ -400,42 +697,85 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>{keys[e.code]=false;});
 function applyKeys(dt){
     if(!playing||paused)return;
-    let dT=0,dP=0;
+    let dT=0;
     if(keys['ArrowLeft']||keys['KeyA'])dT+=1;
     if(keys['ArrowRight']||keys['KeyD'])dT-=1;
-    if(keys['ArrowUp']||keys['KeyW'])dP-=1;
-    if(keys['ArrowDown']||keys['KeyS'])dP+=1;
-    if(dT||dP){
+    if(dT){
+        notePlayerAction();
         controls.autoRotate=false;
-        sph.setFromVector3(camera.position);
-        sph.theta+=dT*2.2*dt;
-        sph.phi=Math.min(Math.PI-0.15,Math.max(0.15,sph.phi+dP*1.8*dt));
-        camera.position.setFromSpherical(sph);
-        camera.lookAt(0,0,0);
+        rotateCameraHorizontal(dT,dt,2.2);
+        return;
+    }
+    if(arrowRotateDir){
+        controls.autoRotate=false;
+        rotateCameraHorizontal(arrowRotateDir,dt,2.35);
+        return;
+    }
+    const now=performance.now();
+    if(autoRotateRemaining>0){
+        idleRotate=true;
+        const step=Math.min(autoRotateRemaining,AUTO_ROTATE_SPEED*dt);
+        rotateCameraHorizontal(-1,step/AUTO_ROTATE_SPEED,AUTO_ROTATE_SPEED);
+        autoRotateRemaining-=step;
+        if(autoRotateRemaining<=0.0001){
+            autoRotateRemaining=0;
+            idleRotate=false;
+            // One full circle is complete. Start a fresh 3-second idle period.
+            lastPlayerActionAt=now;
+        }
+    }else if(now-lastPlayerActionAt>=3000){
+        idleRotate=true;
+        autoRotateRemaining=AUTO_ROTATE_CIRCLE;
     }
 }
+
+const leftRotateBtn=document.getElementById('cube-rotate-left');
+const rightRotateBtn=document.getElementById('cube-rotate-right');
+function bindRotateButton(btn,direction){
+    if(!btn)return;
+    const stop=()=>{ if(arrowRotateDir===direction)arrowRotateDir=0; };
+    btn.addEventListener('pointerdown',e=>{
+        e.preventDefault();
+        if(!playing||paused)return;
+        notePlayerAction();
+        arrowRotateDir=direction;
+        btn.setPointerCapture?.(e.pointerId);
+    });
+    btn.addEventListener('pointerup',stop);
+    btn.addEventListener('pointercancel',stop);
+    btn.addEventListener('lostpointercapture',stop);
+    btn.addEventListener('pointerleave',e=>{ if(e.buttons===0)stop(); });
+}
+bindRotateButton(leftRotateBtn,1);
+bindRotateButton(rightRotateBtn,-1);
+renderer.domElement.addEventListener('pointerdown',()=>{
+    if(playing&&!paused)notePlayerAction();
+},{passive:true});
 
 function loop(){
     requestAnimationFrame(loop);
     const dt=Math.min(clock.getDelta(),0.05),now=performance.now();
     applyKeys(dt);
     controls.update();
-    if(playing&&!paused)dom.hudTime.textContent=((now-startTime)/1000+penalty).toFixed(1)+'s';
+    if(playing&&!paused)dom.hudTime.textContent=((now-startTime)/1000+penalty).toFixed(1)+normalText('seconds');
     anims=anims.filter(a=>{
         const t=Math.min((now-a.start)/1000,1),e=1-Math.pow(1-t,3);
         a.mesh.position.lerpVectors(a.from,a.to,e);
         a.mesh.scale.setScalar(1-e*.8);
-        a.mesh.material.forEach(m=>{m.transparent=true;m.opacity=1-e;});
+        forEachMaterial(a.mesh,m=>{m.transparent=true;m.opacity=1-e;});
         if(t>=1){cubeGroup.remove(a.mesh);return false;}
         return true;
     });
     if(cubeGroup&&playing){const t=now*.001;
         blocks.forEach((b,i)=>{if(!b.userData.consumed)b.position.y=b.userData.base.y+Math.sin(t+i*.4)*.03;});}
-    if(dot&&dotActive&&dotBlock&&!dotBlock.userData.consumed){
-        const out=dotBlock.position.clone().normalize().multiplyScalar(.72);
-        dot.position.lerp(dotBlock.position.clone().add(out),.2);
-        dot.scale.setScalar(1+.25*Math.sin(now*.006));
-    } else if(dot)dot.visible=false;
+    if(playing&&warningBlock&&!warningBlock.userData.consumed){
+        // Flash the cube's own face border. The border is baked into its texture,
+        // so it rotates exactly with the cube and never becomes a floating overlay.
+        const pulse=.5+.5*Math.sin(now*.006);
+        setWarningTexture(warningBlock,pulse>.42);
+    } else if(warningBlock){
+        setWarningTexture(warningBlock,false);
+    }
     if(orchard)orchard.rotation.y+=dt*0.25;
     particles=particles.filter(p=>{
         p.age+=dt;
@@ -450,6 +790,17 @@ function loop(){
         if(p.age>=p.life){scene.remove(p.pts);return false;}
         return true;
     });
+    if(focusAnim){
+        const p=Math.min(1,(now-focusAnim.t0)/focusAnim.duration);
+        const e=easeInOut(p);
+        sph.setFromVector3(camera.position);
+        sph.theta=focusAnim.theta0+(focusAnim.theta1-focusAnim.theta0)*e;
+        sph.phi=Math.PI/2;
+        sph.radius=focusAnim.radius;
+        camera.position.setFromSpherical(sph);
+        camera.lookAt(0,0,0);
+        if(p>=1){focusAnim=null;controls.enabled=true;}
+    }
     if(camAnim){
         const el=(now-camAnim.t0)/1000;
         if(el<1.0)camera.position.lerpVectors(camAnim.from,camAnim.top,easeInOut(el));
@@ -476,5 +827,5 @@ addEventListener('resize',()=>{
 export function init(){
     dom.loading.style.display='none';
     loop();
-    showSelect();
+    window.dispatchEvent(new Event('mathcube-home'));
 }
