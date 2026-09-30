@@ -1,5 +1,7 @@
 import { THREE, scene, camera, renderer, controls, raycaster, mouse } from './three-setup.js';
 import { dom } from './dom.js';
+import { addGoldenApples } from './economy.js';
+
 import { LANG, T, getLang, normalText } from './i18n.js';
 import { SECRET_BIN, SECRET2_BIN, fromBin } from './secrets.js';
 import { ri, pick, shuffle, easeOutBack, easeInOut } from './utils.js';
@@ -481,11 +483,14 @@ function finish(){
     const beatRecord=prevBest!==undefined&&total<prevBest;
     if(beatRecord)progress.records=(progress.records||0)+1;
     progress.wins=(progress.wins||0)+1;
+    addGoldenApples(1);
+    try{const key='mcPhase2RecordsV1';const r=JSON.parse(localStorage.getItem(key)||'{\"speed\":{},\"brain\":{},\"normal\":{levels:0,stars:0,score:0}}');r.normal=r.normal||{levels:0,stars:0,score:0};r.normal.levels=(r.normal.levels||0)+1;r.normal.stars=(r.normal.stars||0)+stars;r.normal.score=Math.max(r.normal.score||0,finalScore);localStorage.setItem(key,JSON.stringify(r));window.dispatchEvent(new Event('mathcube-record-updated'));}catch(e){}
     progress.unlocked=Math.min(MAXLVL,Math.max(progress.unlocked,currentLevel+1));
     progress.stars[currentLevel]=Math.max(progress.stars[currentLevel]||0,stars);
     if(!prevBest||total<prevBest)progress.bestTime[currentLevel]=+total.toFixed(1);
     progress.bestScore[currentLevel]=Math.max(progress.bestScore[currentLevel]||0,finalScore);
     save();
+
     camAnim={t0:performance.now(),from:camera.position.clone(),
         top:new THREE.Vector3(0,9.5,0.6),side:new THREE.Vector3(0,0.5,8)};
     spawnBurst();AudioFX.victory();
