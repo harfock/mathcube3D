@@ -28,3 +28,14 @@ export function importCode(code){
         progress=o;save();return true;
     }catch(e){return false;}
 }
+
+export function reload(){
+    let o=null;
+    try{o=parse(localStorage.getItem(SKEY));}catch(e){}
+    if(!o){try{o=parse(localStorage.getItem(BKEY));}catch(e){}}
+    if(o){
+        for(const k of Object.keys(DEFAULTS)) delete progress[k];
+        Object.assign(progress,o);
+    }
+    return progress;
+}

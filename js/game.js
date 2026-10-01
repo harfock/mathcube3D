@@ -5,7 +5,7 @@ import { addGoldenApples } from './economy.js';
 import { LANG, T, getLang, normalText } from './i18n.js';
 import { SECRET_BIN, SECRET2_BIN, fromBin } from './secrets.js';
 import { ri, pick, shuffle, easeOutBack, easeInOut } from './utils.js';
-import { progress, save, exportCode, importCode } from './progress.js';
+import { progress, save, reload as reloadProgress, exportCode, importCode } from './progress.js';
 import { levelConfig, PHRASES } from './levelconfig.js';
 import { initAppleAssets, createApple, getAppleMat, orchard, clearOrchard, fitOrchard, buildOrchard } from './apple.js';
 import { evalChain, makeMain, makeMissing, makeFind, makeTexture } from './rounds.js';
@@ -25,6 +25,36 @@ let warningBlock=null,warningPulse=0,warningTextureState=null;
 let camAnim=null,focusAnim=null,celebToken=0;
 let persistentHintBlocks=new Set();
 let lastPlayerActionAt=performance.now();
+
+function getEquippedCubeSkin(){try{return localStorage.getItem('mcPhase2EquippedV1')||'';}catch{return '';}}
+function applyEquippedCubeSkin(){
+    if(!cubeGroup)return;
+    const skin=getEquippedCubeSkin();
+    cubeGroup.traverse(obj=>{
+        if(!obj.isMesh||!obj.userData?.num)return;
+        const materials=Array.isArray(obj.material)?obj.material:[obj.material];
+        materials.forEach(mat=>{
+            if(!mat)return;
+            if(mat.userData.__mcBaseMetalness===undefined){
+                mat.userData.__mcBaseMetalness=mat.metalness??0;
+                mat.userData.__mcBaseRoughness=mat.roughness??1;
+                mat.userData.__mcBaseEmissive=mat.emissive?.getHex?.()??0;
+                mat.userData.__mcBaseEmissiveIntensity=mat.emissiveIntensity??1;
+            }
+            if(skin==='cyber_cube'){
+                mat.metalness=Math.max(mat.userData.__mcBaseMetalness,.55);
+                mat.roughness=Math.min(mat.userData.__mcBaseRoughness,.24);
+                if(mat.emissive){mat.emissive.setHex(0x00d9ff);mat.emissiveIntensity=.42;}
+            }else{
+                mat.metalness=mat.userData.__mcBaseMetalness;
+                mat.roughness=mat.userData.__mcBaseRoughness;
+                if(mat.emissive){mat.emissive.setHex(mat.userData.__mcBaseEmissive);mat.emissiveIntensity=mat.userData.__mcBaseEmissiveIntensity;}
+            }
+            mat.needsUpdate=true;
+        });
+    });
+}
+window.addEventListener('mathcube-cosmetic-changed',()=>{if(playing&&cubeGroup)applyEquippedCubeSkin();});
 let idleRotate=false;
 let autoRotateRemaining=0;
 let arrowRotateDir=0;
@@ -55,16 +85,17 @@ function buildLevel(lv){
     autoRotateRemaining=0;
     arrowRotateDir=0;
     currentLevel=lv;cfg=levelConfig(lv);
+    AudioFX.setProfile('normal');
     roundIndex=0;totalRounds=cfg.R;score=0;combo=0;wrongCount=0;penalty=0;
     hintsLeft=3+(progress.records||0);hintsUsed=0;
     codeUsedRespect=false;codeUsedHumble=false;verifyUses=3;
     playing=true;startTime=performance.now();dotActive=false;
     dom.hud.classList.remove('dim');
     dom.hintBtn.classList.remove('off');dom.hintCount.textContent=hintsLeft;
-    dom.codeBtn.classList.remove('off');dom.codeBtn.textContent=normalText('code');
+    dom.codeBtn.classList.add('off');dom.codeBtn.textContent=normalText('code');
     dom.verifyBtn.classList.remove('off');dom.verifyBtn.textContent=normalText('verify');dom.verifyCount.textContent=verifyUses;
     dom.verifyPanel.classList.remove('show');
-    dom.codeStack.style.display=lv>=15?'flex':'none';
+    dom.codeStack.style.display='none';
     dom.verifyStack.style.display=lv>=15?'flex':'none';
     dom.advStack.style.display=lv>=18?'flex':'none';
     dom.hudLevel.textContent=getLang()==='zh'?`${normalText('level')}${lv}${normalText('levelSuffix')}`:`${normalText('level')} ${lv}`;
@@ -73,7 +104,7 @@ function buildLevel(lv){
     dom.verifyBtn.textContent=normalText('verify');
     dom.advBtn.querySelector('.in2').textContent=normalText('hintX2');
     dom.hudBack.textContent=normalText('home');
-    if(dom.hudHearts){const h=Number(localStorage.getItem('mcHearts') ?? 10);const hv=document.getElementById('hud-hearts-value');if(hv)hv.textContent='('+h+')';else dom.hudHearts.textContent='('+h+')';}
+    if(dom.hudHearts){const h=Number(localStorage.getItem('mcPoints') ?? 10);const hv=document.getElementById('hud-hearts-value');if(hv)hv.textContent='('+h+')';else dom.hudHearts.textContent='('+h+')';}
     dom.assistBtn.textContent=normalText('assist');
     dom.assistClose.setAttribute('aria-label',normalText('closeAssist'));
     dom.assistClose.title=normalText('closeAssist');
@@ -106,6 +137,7 @@ function buildLevel(lv){
         }
     }
     dot=null;dotBlock=null;dotActive=false;warningBlock=null;warningPulse=0;warningTextureState=null;
+    applyEquippedCubeSkin();
     startRound();
     AudioFX.levelStart();
 }
@@ -484,12 +516,24 @@ function finish(){
     if(beatRecord)progress.records=(progress.records||0)+1;
     progress.wins=(progress.wins||0)+1;
     addGoldenApples(1);
-    try{const key='mcPhase2RecordsV1';const r=JSON.parse(localStorage.getItem(key)||'{\"speed\":{},\"brain\":{},\"normal\":{levels:0,stars:0,score:0}}');r.normal=r.normal||{levels:0,stars:0,score:0};r.normal.levels=(r.normal.levels||0)+1;r.normal.stars=(r.normal.stars||0)+stars;r.normal.score=Math.max(r.normal.score||0,finalScore);localStorage.setItem(key,JSON.stringify(r));window.dispatchEvent(new Event('mathcube-record-updated'));}catch(e){}
     progress.unlocked=Math.min(MAXLVL,Math.max(progress.unlocked,currentLevel+1));
     progress.stars[currentLevel]=Math.max(progress.stars[currentLevel]||0,stars);
+    try{
+        const key='mcPhase2RecordsV1';
+        const r=JSON.parse(localStorage.getItem(key)||'{"speed":{},"brain":{},"normal":{"levels":0,"stars":0,"score":0}}');
+        r.normal=r.normal||{levels:0,stars:0,score:0};
+        const completedLevels=Object.keys(progress.stars||{}).filter(k=>Number(progress.stars[k]||0)>0).length;
+        const totalStars=Object.values(progress.stars||{}).reduce((sum,v)=>sum+Number(v||0),0);
+        r.normal.levels=Math.max(Number(r.normal.levels||0),completedLevels);
+        r.normal.stars=totalStars;
+        r.normal.score=Math.max(Number(r.normal.score||0),finalScore);
+        localStorage.setItem(key,JSON.stringify(r));
+    }catch(e){console.warn('v11 normal record update failed',e);}
     if(!prevBest||total<prevBest)progress.bestTime[currentLevel]=+total.toFixed(1);
     progress.bestScore[currentLevel]=Math.max(progress.bestScore[currentLevel]||0,finalScore);
     save();
+    window.dispatchEvent(new Event('mathcube-record-updated'));
+    window.dispatchEvent(new Event('mathcube-normal-progress-updated'));
 
     camAnim={t0:performance.now(),from:camera.position.clone(),
         top:new THREE.Vector3(0,9.5,0.6),side:new THREE.Vector3(0,0.5,8)};
@@ -622,16 +666,16 @@ function animateTime(el,target,duration){
     }
     requestAnimationFrame(tick);
 }
-dom.btnNext.addEventListener('click',()=>{AudioFX.button();if(failedLevel){const h=Number(localStorage.getItem('mcHearts') ?? 10);if(h<=0){window.dispatchEvent(new Event('mathcube-home'));return;}localStorage.setItem('mcHearts',String(h-1));const hv=document.getElementById('hud-hearts-value');if(hv)hv.textContent='('+(h-1)+')';else if(dom.hudHearts)dom.hudHearts.textContent='('+(h-1)+')';dom.screenResult.classList.remove('active');startLevel(currentLevel);failedLevel=false;return;}dom.screenResult.classList.remove('active');startLevel(currentLevel+1);});
+dom.btnNext.addEventListener('click',()=>{AudioFX.button();if(failedLevel){const h=Number(localStorage.getItem('mcPoints') ?? 10);if(h<=0){window.dispatchEvent(new Event('mathcube-home'));return;}localStorage.setItem('mcPoints',String(h-1));const hv=document.getElementById('hud-hearts-value');if(hv)hv.textContent='('+(h-1)+')';else if(dom.hudHearts)dom.hudHearts.textContent='('+(h-1)+')';dom.screenResult.classList.remove('active');startLevel(currentLevel);failedLevel=false;return;}dom.screenResult.classList.remove('active');startLevel(currentLevel+1);});
 dom.btnMenu.addEventListener('click',()=>{AudioFX.button();dom.screenResult.classList.remove('active');clearLevel();dom.hud.classList.remove('active');dom.btnNext.textContent=normalText('next');dom.btnMenu.textContent=normalText('levels');window.dispatchEvent(new Event('mathcube-home'));});
 dom.hudBack.addEventListener('click',()=>{AudioFX.button();playing=false;clearLevel();dom.hud.classList.remove('active');window.dispatchEvent(new Event('mathcube-home'));});
 
-dom.btnExport.addEventListener('click',()=>{AudioFX.button();prompt(normalText('saveDone'),exportCode());});
-dom.btnImport.addEventListener('click',()=>{
+dom.btnExport?.addEventListener('click',()=>{AudioFX.button();prompt(normalText('saveDone'),exportCode());});
+dom.btnImport?.addEventListener('click',()=>{
     AudioFX.button();
     const code=prompt(normalText('load'),'');
     if(code===null||code==='')return;
-    if(importCode(code)){timePopup(normalText('loadOk'));showSelect();}
+    if(importCode(code)){timePopup(normalText('loadOk'));showSelect();window.dispatchEvent(new Event('mathcube-record-updated'));window.dispatchEvent(new Event('mathcube-normal-progress-updated'));}
     else timePopup(normalText('loadBad'));
 });
 
@@ -665,12 +709,14 @@ function applyNormalLanguage(){
 window.addEventListener('mathcube-language-changed',()=>{applyNormalLanguage(); if(playing) buildLevel(currentLevel);});
 
 export function showSelect(){
+    const saveWrap=document.getElementById('save-wrap');if(saveWrap)saveWrap.hidden=true;
     applyNormalLanguage();
     controls.enabled=true;controls.autoRotate=false;camAnim=null;
     controls.target.set(0,0,0);
     menuCamera();
     dom.screenSelect.classList.add('active');
-    dom.btnExport.textContent=normalText('save');dom.btnImport.textContent=normalText('load');
+    if(dom.btnExport)dom.btnExport.textContent=normalText('save');
+    if(dom.btnImport)dom.btnImport.textContent=normalText('load');
     dom.levelPath.innerHTML='';
     for(let lv=1;lv<=MAXLVL;lv++){
         const locked=lv>progress.unlocked;
@@ -687,7 +733,7 @@ export function showSelect(){
 }
 function startLevel(lv){
     dom.hud.classList.add('active');
-    if(dom.hudHearts){const h=Math.min(10,Math.max(0,Number(localStorage.getItem('mcHearts') ?? 10)));const hv=document.getElementById('hud-hearts-value');if(hv)hv.textContent='('+h+')';else dom.hudHearts.textContent='('+h+')';}
+    if(dom.hudHearts){const h=Math.min(10,Math.max(0,Number(localStorage.getItem('mcPoints') ?? 10)));const hv=document.getElementById('hud-hearts-value');if(hv)hv.textContent='('+h+')';else dom.hudHearts.textContent='('+h+')';}
     dom.screenSelect.classList.remove('active');dom.screenResult.classList.remove('active');
     controls.enabled=true;controls.autoRotate=false;
     controls.target.set(0,0,0);
@@ -827,6 +873,13 @@ addEventListener('resize',()=>{
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth,innerHeight);
     if(dom.screenSelect.classList.contains('active')){menuCamera();fitOrchard();}
+});
+
+window.addEventListener('mathcube-state-loaded',()=>{
+    try{
+        reloadProgress();
+        if(typeof showSelect==='function')showSelect();
+    }catch(e){console.warn('v11 game state reload failed',e);}
 });
 
 export function init(){

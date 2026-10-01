@@ -86,7 +86,7 @@ export async function submitGameSession(payload){
 }
 export { client as supabase };
 
-// v10 Player ID + 5-slot cloud save API. Player ID is the cross-browser guest identity;
+// v11 Player ID persistence + 5-slot save API (v10 RPC-compatible). Player ID is the cross-browser guest identity;
 // anonymous Auth remains available for legacy Phase 2 services.
 export async function v10CreatePlayer(playerId, language='en', state={}){
   if(!client)return null;

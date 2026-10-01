@@ -2426,7 +2426,7 @@ body{background:radial-gradient(circle at 20% 10%,rgba(32,227,178,.10),transpare
 
 
 /* v8 FINAL — Canvas is the authoritative Combo FX; suppress legacy fire visuals. */
-#mc-endless-screen .mc-combo-station{position:relative!important;overflow:visible!important;isolation:isolate!important;}
+#mc-endless-screen .mc-combo-station{position:relative!important;overflow:visible!important;isolation:isolate!important;contain:none!important;}
 #mc-endless-screen #mc-combo-fx-canvas{position:absolute!important;inset:-30px -24px!important;width:calc(100% + 48px)!important;height:calc(100% + 60px)!important;z-index:1!important;display:block!important;pointer-events:none!important;}
 #mc-endless-screen .mc-combo-station>*:not(#mc-combo-fx-canvas){position:relative;z-index:3;}
 #mc-endless-screen .mc-combo-fire,#mc-endless-screen .mc-combo-fire-border{display:none!important;}
@@ -2495,5 +2495,60 @@ body{background:radial-gradient(circle at 20% 10%,rgba(32,227,178,.10),transpare
 .mc-player-view[hidden]{display:none}.mc-player-existing{padding:16px;border-radius:18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);margin-bottom:14px}.mc-player-existing span,.mc-player-slot-head span{display:block;color:#8ea2bb;font-size:12px;letter-spacing:.12em}.mc-player-existing strong{display:block;font-size:24px;letter-spacing:.12em;margin:5px 0 13px;color:#8eefff}
 .mc-player-primary,.mc-player-secondary,.mc-player-slot-head button{width:100%;min-height:52px;border-radius:15px;border:1px solid rgba(255,255,255,.16);font:700 16px inherit;cursor:pointer}.mc-player-primary{background:linear-gradient(90deg,#20e3b2,#20b8ff);color:#07111c}.mc-player-secondary{background:rgba(255,255,255,.07);color:#fff}.mc-player-divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:#71839d;font-size:12px}.mc-player-divider:before,.mc-player-divider:after{content:"";height:1px;flex:1;background:rgba(255,255,255,.10)}
 .mc-player-label{display:block;text-align:left;color:#9db0c7;font-size:12px;letter-spacing:.12em;margin-bottom:7px}.mc-player-input{width:100%;height:54px;box-sizing:border-box;border-radius:14px;border:1px solid rgba(112,220,255,.24);background:#07101d;color:#fff;text-align:center;font:800 21px inherit;letter-spacing:.12em;outline:none;margin-bottom:10px}.mc-player-input:focus{border-color:#20b8ff;box-shadow:0 0 0 3px rgba(32,184,255,.10)}
-.mc-player-error{min-height:22px;margin-top:10px;color:#ff8e9c;font-size:13px}.mc-player-slot-head{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;text-align:left;margin-bottom:16px}.mc-player-slot-head strong{color:#8eefff;letter-spacing:.1em}.mc-player-slot-head button{width:auto;min-height:38px;padding:0 12px;font-size:12px;background:rgba(255,255,255,.07);color:#fff}.mc-player-slots{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}.mc-save-slot{min-height:126px;padding:16px;text-align:left;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);color:#fff;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px}.mc-save-slot:hover,.mc-save-slot.active{border-color:rgba(32,227,178,.48);background:linear-gradient(135deg,rgba(32,227,178,.09),rgba(139,92,246,.10))}.mc-save-slot strong{font-size:18px}.mc-save-slot span{color:#8eefff;font-size:14px}.mc-save-slot small{color:#8294ab;font-size:11px;letter-spacing:.1em}.mc-player-home-id{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-size:11px;color:#86a0b7;letter-spacing:.08em;white-space:nowrap}
+.mc-player-error{min-height:22px;margin-top:10px;color:#ff8e9c;font-size:13px}.mc-player-slot-head{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;text-align:left;margin-bottom:16px}.mc-player-slot-head strong{color:#8eefff;letter-spacing:.1em}.mc-player-slot-head button{width:auto;min-height:38px;padding:0 12px;font-size:12px;background:rgba(255,255,255,.07);color:#fff}.mc-player-slots{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}.mc-save-slot{min-height:126px;padding:16px;text-align:left;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);color:#fff;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:6px}.mc-save-slot:hover,.mc-save-slot.active{border-color:rgba(32,227,178,.48);background:linear-gradient(135deg,rgba(32,227,178,.09),rgba(139,92,246,.10))}.mc-save-slot strong{font-size:18px}.mc-save-slot span{color:#8eefff;font-size:14px}.mc-save-slot small{color:#8294ab;font-size:11px;letter-spacing:.1em}.mc-player-home-id{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;font-size:11px;color:#86a0b7;letter-spacing:.08em;white-space:nowrap;z-index:80}
 @media(max-width:600px){.mc-player-card{padding:24px 16px;border-radius:24px}.mc-player-slots{grid-template-columns:1fr}.mc-player-home-id{bottom:8px;font-size:10px}.mc-player-subtitle{margin-bottom:20px}}
+
+/* v11 RECORD + COMBO / iPhone resilience */
+#mc-home .mc-cloud-status{position:absolute;left:10px;bottom:10px;align-self:auto;margin:0!important;z-index:6}
+#mc-endless-screen #mc-combo-count{transform-origin:center!important}
+@keyframes mc-v11-heartbeat{0%{transform:scale(1)}18%{transform:scale(2)}42%{transform:scale(1.55)}68%{transform:scale(.94)}100%{transform:scale(1)}}
+#mc-endless-screen #mc-combo-count.mc-combo-pop{animation:mc-v11-heartbeat .48s cubic-bezier(.16,.9,.2,1)!important}
+#mc-endless-screen #mc-combo-pop{position:absolute;left:50%;top:-30px;transform:translate(-50%,10px) scale(.55);font-family:Impact,"Arial Black",system-ui,sans-serif;font-size:clamp(22px,3.5vw,42px);font-weight:1000;letter-spacing:.08em;color:#fff6b0;-webkit-text-stroke:2px rgba(45,8,0,.9);text-shadow:0 4px 0 rgba(35,5,0,.8),0 0 22px rgba(255,177,56,.95);opacity:0;pointer-events:none;z-index:8;white-space:nowrap}
+#mc-endless-screen #mc-combo-pop.show{animation:mc-v11-combo-word .52s cubic-bezier(.12,.9,.2,1) forwards}
+@keyframes mc-v11-combo-word{0%{opacity:0;transform:translate(-50%,12px) scale(.55)}18%{opacity:1;transform:translate(-50%,-5px) scale(1.18)}45%{opacity:1;transform:translate(-50%,-13px) scale(1)}100%{opacity:0;transform:translate(-50%,-30px) scale(.92)}}
+@media(max-width:600px){.mc-player-record-actions{grid-template-columns:1fr}.mc-player-record-actions button{min-height:44px!important}#mc-home .mc-cloud-status{left:8px;bottom:8px;font-size:9px;padding:5px 9px}.mc-player-home-id{max-width:70vw;overflow:hidden;text-overflow:ellipsis}}
+@media(prefers-reduced-motion:reduce){#mc-endless-screen #mc-combo-count.mc-combo-pop,#mc-endless-screen #mc-combo-pop.show{animation:none!important;opacity:1;transform:translate(-50%,-5px) scale(1)}}
+
+
+/* v12 achievement unread badge */
+.mc-achievement-menu-btn{position:relative;}
+.mc-achievement-unread{display:none;position:absolute;top:-7px;right:-7px;min-width:23px;height:23px;padding:0 5px;border-radius:50%;align-items:center;justify-content:center;background:#ff426d;color:#fff;border:2px solid rgba(14,17,34,.95);font-size:11px;line-height:1;font-weight:900;box-shadow:0 0 14px rgba(255,66,109,.55);font-variant-numeric:tabular-nums;}
+.mc-achievement-unread.show{display:flex;}
+#save-wrap{display:none!important;}\n
+/* v13.1 player identity row: keep it below the Brain Training card instead of overlapping it. */
+#mc-home .mc-player-home-id{position:absolute;left:50%;bottom:42px;transform:translateX(-50%);z-index:20;}
+#mc-home .mc-cloud-status{bottom:10px;}
+@media(max-width:600px){#mc-home .mc-player-home-id{bottom:40px;max-width:90vw;overflow:hidden;text-overflow:ellipsis;}#mc-home .mc-cloud-status{bottom:8px;}}
+/* v13.1 explicit heartbeat fallback. */
+#mc-endless-screen #mc-combo-count{will-change:transform;}
+
+
+/* V14 STEP3 — Speed/Brain shared question presentation + Brain Novice milestone */
+#mc-endless-screen .mc-prompt{white-space:nowrap;font-size:clamp(24px,3.2vw,42px)!important;line-height:1.05;margin:5px 0 8px;}
+#mc-endless-screen .mc-equation{display:none!important;}
+#mc-endless-screen.mc-no-countdown .mc-timebar,
+#mc-endless-screen.mc-no-countdown .mc-time-text{display:none!important;}
+#mc-endless-screen.mc-no-countdown .mc-question-area{padding-bottom:clamp(8px,1.4vh,16px);}
+.mc-brain-milestone{position:fixed;inset:0;z-index:1200;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;visibility:hidden;background:radial-gradient(circle at 50% 45%,rgba(32,227,178,.20),rgba(7,17,31,.82) 48%,rgba(7,17,31,.94));backdrop-filter:blur(5px);}
+.mc-brain-milestone.show{opacity:1;visibility:visible;animation:mc-milestone-in .28s ease-out both;}
+.mc-clap-hands{position:relative;width:150px;height:125px;margin-bottom:10px;}
+.mc-hand{position:absolute;top:20px;width:58px;height:88px;border-radius:42% 58% 42% 48%;background:linear-gradient(145deg,#f4fbff,#9be8ff 55%,#8b5cf6);box-shadow:0 0 28px rgba(69,229,255,.42);}
+.mc-hand::before,.mc-hand::after{content:"";position:absolute;background:inherit;border-radius:20px;}
+.mc-hand::before{width:30px;height:58px;top:-18px;}
+.mc-hand::after{width:24px;height:50px;top:-12px;}
+.mc-hand-left{left:18px;transform:rotate(24deg);animation:mc-clap-left .32s ease-in-out infinite alternate;}
+.mc-hand-left::before{left:8px;transform:rotate(-16deg);}
+.mc-hand-left::after{left:30px;transform:rotate(9deg);}
+.mc-hand-right{right:18px;transform:scaleX(-1) rotate(24deg);animation:mc-clap-right .32s ease-in-out infinite alternate;}
+.mc-hand-right::before{left:8px;transform:rotate(-16deg);}
+.mc-hand-right::after{left:30px;transform:rotate(9deg);}
+.mc-clap-burst{position:absolute;width:8px;height:8px;border-radius:50%;background:#53f0d1;box-shadow:0 0 14px #53f0d1;animation:mc-clap-spark .75s ease-out infinite;}
+.mc-clap-burst.b1{left:8px;top:8px}.mc-clap-burst.b2{right:8px;top:12px;animation-delay:.18s}.mc-clap-burst.b3{left:70px;top:0;animation-delay:.36s}
+.mc-milestone-title{font-size:clamp(30px,7vw,64px);font-weight:900;letter-spacing:.08em;color:#fff;text-shadow:0 0 28px rgba(83,240,209,.55);}
+.mc-milestone-sub{margin-top:5px;font-size:clamp(18px,3vw,28px);color:#53f0d1;font-weight:800;}
+@keyframes mc-clap-left{0%{transform:translateX(0) rotate(24deg)}100%{transform:translateX(22px) rotate(7deg)}}
+@keyframes mc-clap-right{0%{transform:scaleX(-1) translateX(0) rotate(24deg)}100%{transform:scaleX(-1) translateX(22px) rotate(7deg)}}
+@keyframes mc-clap-spark{0%{opacity:0;transform:scale(.5)}30%{opacity:1}100%{opacity:0;transform:translateY(-28px) scale(1.5)}}
+@keyframes mc-milestone-in{0%{transform:scale(.96)}100%{transform:scale(1)}}
+@media(max-width:650px){#mc-endless-screen .mc-prompt{font-size:clamp(17px,5.5vw,28px)!important;margin:4px 0 7px;} .mc-clap-hands{transform:scale(.82);margin-bottom:0}.mc-milestone-title{font-size:clamp(27px,8vw,44px)}}
+@media(prefers-reduced-motion:reduce){.mc-hand-left,.mc-hand-right,.mc-clap-burst,.mc-brain-milestone.show{animation:none!important}.mc-brain-milestone.show{opacity:1;}}
