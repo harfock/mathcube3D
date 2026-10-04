@@ -84,6 +84,13 @@ export async function submitGameSession(payload){
   if(error)throw error;
   return data;
 }
+export async function fetchGameSessions(limit=100){
+  if(!client)return [];
+  await ensureAnonymousSession();
+  const {data,error}=await client.from('game_sessions').select('*').order('ended_at',{ascending:false}).limit(Math.max(1,Math.min(100,Number(limit)||100)));
+  if(error)throw error;
+  return data||[];
+}
 export { client as supabase };
 
 // v11 Player ID persistence + 5-slot save API (v10 RPC-compatible). Player ID is the cross-browser guest identity;

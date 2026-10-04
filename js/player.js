@@ -141,9 +141,8 @@ async function continuePlayer(id){
       activeSlot=getActiveSlot();
       if(!slots[activeSlot-1])activeSlot=1;
       setLocalPlayer({...player,slots});
-      renderSlots();show('slots');
-      setStatus(cloudReady()?'SYNCING':'LOCAL');
       busy=false;
+      await selectSlot(activeSlot);
       if(cloudReady())reconcileCloudRecord({applyActive:false}).then(()=>setStatus('CONNECTED')).catch(()=>setStatus('LOCAL'));
       return;
     }
@@ -166,7 +165,8 @@ async function continuePlayer(id){
     slots=ensureSlots(cloud.slots||[]);
     activeSlot=getActiveSlot(); if(!slots[activeSlot-1])activeSlot=1;
     setLocalPlayer({...player,slots});
-    renderSlots();show('slots');
+    busy=false;
+    await selectSlot(activeSlot);
     setStatus('CONNECTED');
   }catch(e){
     console.warn('v14 login player load failed',e);

@@ -1,6 +1,7 @@
 import { THREE, scene, camera, renderer, controls, raycaster, mouse } from './three-setup.js';
 import { dom } from './dom.js';
 import { addGoldenApples } from './economy.js';
+import { cloudReady, submitGameSession } from './supabase.js';
 
 import { LANG, T, getLang, normalText } from './i18n.js';
 import { SECRET_BIN, SECRET2_BIN, fromBin } from './secrets.js';
@@ -11,8 +12,10 @@ import { initAppleAssets, createApple, getAppleMat, orchard, clearOrchard, fitOr
 import { evalChain, makeMain, makeMissing, makeFind, makeTexture } from './rounds.js';
 import AudioFX from './AudioManager.js';
 
-addEventListener('pointerdown',()=>AudioFX.unlock());
+addEventListener('pointerdown',()=>AudioFX.unlock(),{passive:true});
+addEventListener('touchstart',()=>AudioFX.unlock(),{passive:true});
 addEventListener('keydown',()=>AudioFX.unlock());
+addEventListener('visibilitychange',()=>{if(!document.hidden)AudioFX.unlock();});
 
 const MAXLVL=20;
 let currentLevel=1,cfg=null,blocks=[],blanks=[],anims=[],particles=[];
@@ -527,8 +530,12 @@ function finish(){
         r.normal.levels=Math.max(Number(r.normal.levels||0),completedLevels);
         r.normal.stars=totalStars;
         r.normal.score=Math.max(Number(r.normal.score||0),finalScore);
+        r.history=Array.isArray(r.history)?r.history:[];
+        r.history.unshift({id:`normal-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,mode:'normal',score:Math.round(finalScore),accuracy:total?Math.max(0,(total-wrongCount)/total):0,combo:0,level:Number(currentLevel||0),stars:Number(stars||0),questions:Number(total||0),correct:Math.max(0,total-wrongCount),incorrect:Number(wrongCount||0),misses:0,playTime:Number(total||0),endedAt:new Date().toISOString()});
+        r.history=r.history.slice(0,100);
         localStorage.setItem(key,JSON.stringify(r));
     }catch(e){console.warn('v11 normal record update failed',e);}
+    if(cloudReady()){const payload={mode:'normal',score:Math.max(0,Math.round(finalScore)),best_combo:0,accuracy:total?Math.max(0,(total-wrongCount)/total):0,average_answer_time:0,fastest_answer:0,highest_level:Number(currentLevel||0),highest_difficulty:0,questions_completed:Number(total||0),golden_apples_earned:1,started_at:new Date(Date.now()-Math.round(total*1000)).toISOString(),ended_at:new Date().toISOString()};submitGameSession(payload).catch(e=>console.warn('Math Cube normal cloud session save failed:',e));}
     if(!prevBest||total<prevBest)progress.bestTime[currentLevel]=+total.toFixed(1);
     progress.bestScore[currentLevel]=Math.max(progress.bestScore[currentLevel]||0,finalScore);
     save();
@@ -536,7 +543,7 @@ function finish(){
     window.dispatchEvent(new Event('mathcube-normal-progress-updated'));
 
     camAnim={t0:performance.now(),from:camera.position.clone(),
-        top:new THREE.Vector3(0,9.5,0.6),side:new THREE.Vector3(0,0.5,8)};
+        top:new THREE.Vector3(0.65,3.35,1.35),side:new THREE.Vector3(0.30,2.10,0.88)};
     spawnBurst();AudioFX.victory();
     if(cubeGroup)cubeGroup.visible=false;
     const tk=celebToken;
@@ -856,12 +863,31 @@ function loop(){
         const el=(now-camAnim.t0)/1000;
         if(el<1.0)camera.position.lerpVectors(camAnim.from,camAnim.top,easeInOut(el));
         else if(el<2.6)camera.position.lerpVectors(camAnim.top,camAnim.side,easeInOut((el-1.0)/1.6));
-        camera.lookAt(0,0,0);
+        camera.lookAt(0,0.86,0);
     }
     if(apple){
         const t=(now-apple.userData.spawn)/1000;
-        apple.scale.setScalar(Math.max(.001,easeOutBack(Math.min(1,t/.6))));
-        apple.rotation.y=-6*Math.PI*easeInOut(Math.min(1,t/3));
+        apple.scale.setScalar(Math.max(.001,easeOutBack(Math.min(1,t/.48))));
+        // Keep the celebration focused on the stem/top.  The spin is real, but the
+        // final orientation is deterministic instead of depending on a fractional
+        // number of turns.  This prevents the apple underside from becoming the
+        // last visible frame.
+        const spinP=Math.min(1,t/2.65);
+        const settleP=Math.min(1,Math.max(0,(t-2.65)/0.35));
+        const spinEase=easeInOut(spinP);
+        const finalY=0.42;
+        apple.rotation.x=-0.34-0.06*Math.sin(spinEase*Math.PI);
+        apple.rotation.y=spinEase*(2.25*2*Math.PI)+0.12;
+        if(settleP>0){
+            const sy=apple.rotation.y;
+            const syNorm=sy%(Math.PI*2);
+            const target=finalY;
+            let delta=target-syNorm;
+            if(delta>Math.PI)delta-=Math.PI*2;
+            if(delta<-Math.PI)delta+=Math.PI*2;
+            apple.rotation.y=syNorm+delta*easeInOut(settleP);
+            apple.rotation.x=-0.34+0.02*easeInOut(settleP);
+        }
         apple.userData.glow.intensity=5*(1+Math.sin(t*8)*.4);
         const am=getAppleMat();if(am)am.emissiveIntensity=.9+.25*Math.sin(t*8);
         apple.userData.sparkles.material.opacity=.55+.4*Math.sin(t*6);

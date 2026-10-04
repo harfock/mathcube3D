@@ -4,8 +4,28 @@
 // Speed Training = Hyper / Arcade. Brain Training = Calm / Focus.
 // ============================================================
 class AudioManager {
-    constructor(){this.ctx=null;this.master=null;this.comp=null;this.enabled=true;this.profile='normal';this.lastBeat=0;}
-    unlock(){try{if(!this.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;this.ctx=new AC();this.comp=this.ctx.createDynamicsCompressor();this.master=this.ctx.createGain();this.master.gain.value=.48;this.master.connect(this.comp);this.comp.connect(this.ctx.destination);}if(this.ctx.state==='suspended')this.ctx.resume();}catch(e){}}
+    constructor(){this.ctx=null;this.master=null;this.comp=null;this.enabled=true;this.profile='normal';this.lastBeat=0;this.resumePromise=null;}
+    unlock(){
+        try{
+            const AC=window.AudioContext||window.webkitAudioContext;
+            if(!AC)return false;
+            if(!this.ctx){
+                this.ctx=new AC();
+                this.comp=this.ctx.createDynamicsCompressor();
+                this.master=this.ctx.createGain();
+                this.master.gain.value=.48;
+                this.master.connect(this.comp);
+                this.comp.connect(this.ctx.destination);
+            }
+            if(this.ctx.state==='suspended'&&typeof this.ctx.resume==='function'){
+                try{
+                    const p=this.ctx.resume();
+                    if(p&&typeof p.then==='function'){this.resumePromise=p.catch(()=>{});}
+                }catch(e){}
+            }
+            return this.ctx.state!=='closed';
+        }catch(e){return false;}
+    }
     ensure(){this.unlock();return this.enabled&&this.ctx?this.ctx:null;}
     setMuted(m){this.enabled=!m;} toggle(){this.enabled=!this.enabled;return this.enabled;}
     setProfile(mode){this.profile=mode==='brain'?'brain':mode==='speed'?'speed':'normal';}
@@ -28,7 +48,7 @@ class AudioManager {
     miss(mode,timeout=false){this.setProfile(mode);if(mode==='speed'){this.tone({freq:260,freqEnd:110,type:'sawtooth',gain:.065,attack:.002,decay:.07,release:.12});if(timeout)this.noise({gain:.025,attack:.002,release:.1,filterType:'highpass',freqStart:900,freqEnd:400});}else{this.tone({freq:300,freqEnd:220,type:'sine',gain:.045,attack:.02,decay:.08,release:.28});}}
     comboBeat(mode,combo){this.setProfile(mode);const now=performance.now();if(now-this.lastBeat<55)return;this.lastBeat=now;if(mode==='speed'){const f=105+Math.min(95,combo*2.2);this.tone({freq:f,freqEnd:f*1.5,type:'square',gain:.045,attack:.002,decay:.018,release:.055});}else{const f=110+Math.min(70,combo*1.4);this.tone({freq:f,type:'sine',gain:.028,attack:.01,decay:.04,release:.18});}}
     comboTier(mode,tier){this.setProfile(mode);if(mode==='speed'){const notes={warm:523,fire:659,hot:784,ultra:988,extreme:1175};const f=notes[tier]||523;this.tone({freq:f,type:'square',gain:.07,attack:.003,decay:.04,release:.1});this.tone({freq:f*1.5,type:'triangle',gain:.055,attack:.003,decay:.05,release:.15,delay:.055});}else{const notes={warm:440,fire:523,hot:659,ultra:784,extreme:988};const f=notes[tier]||440;this.tone({freq:f,type:'sine',gain:.045,attack:.025,decay:.08,release:.28});this.tone({freq:f*1.25,type:'sine',gain:.025,attack:.025,decay:.08,release:.34,delay:.09});}}
-    comboHeartbeat(mode,combo){this.setProfile(mode);const pulse=Math.min(2,1+Math.log10(Math.max(1,combo))*.65);if(mode==='speed'){this.tone({freq:90*pulse,type:'sine',gain:.07,attack:.002,decay:.025,release:.08});this.tone({freq:180*pulse,type:'square',gain:.035,attack:.002,decay:.02,release:.06,delay:.055});}else{this.tone({freq:196*pulse,type:'sine',gain:.035,attack:.025,decay:.055,release:.2});}}
+    comboHeartbeat(mode,combo){this.setProfile(mode);const strength=Math.min(1.35,1+Math.log10(Math.max(1,combo))*.22);const low=mode==='speed'?78:68;this.tone({freq:low,freqEnd:Math.max(48,low*.72),type:'sine',gain:.105*strength,attack:.002,decay:.035,release:.085});this.tone({freq:low*1.22,freqEnd:Math.max(52,low*.82),type:'sine',gain:.075*strength,attack:.002,decay:.028,release:.075,delay:.095});}
     pressure(mode){this.setProfile(mode);if(mode==='speed'){this.tone({freq:880,type:'square',gain:.028,attack:.002,decay:.018,release:.045});}else{this.tone({freq:330,type:'sine',gain:.022,attack:.015,decay:.035,release:.12});}}
     difficultyUp(){this.setProfile('brain');this.tone({freq:392,type:'sine',gain:.04,attack:.02,decay:.07,release:.22});this.tone({freq:523,type:'sine',gain:.035,attack:.02,decay:.08,release:.28,delay:.09});this.tone({freq:659,type:'sine',gain:.028,attack:.02,decay:.09,release:.34,delay:.18});}
     trainingComplete(mode){this.setProfile(mode);if(mode==='speed'){const seq=[523,659,784,1046,1318];seq.forEach((f,i)=>this.tone({freq:f,type:i<3?'square':'triangle',gain:.075-i*.008,attack:.003,decay:.045,release:.16,delay:i*.085}));this.noise({gain:.035,attack:.01,release:.22,filterType:'highpass',freqStart:1400,freqEnd:2600,delay:.25});}else{const seq=[392,523,659,784];seq.forEach((f,i)=>this.tone({freq:f,type:'sine',gain:.045,attack:.025,decay:.08,release:.3,delay:i*.14}));}}
